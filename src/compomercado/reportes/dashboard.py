@@ -309,12 +309,47 @@ def seccion_estado(res: Resultados) -> str:
 </div>
 <h3>Pilares</h3>{t_pilares}
 {_bloque_sp500(res)}
+{_bloque_calendario(res)}
 <h3>Qué pasó después, según el nivel del puntaje</h3>{t_base}
 <p class="pie">Base: todas las ruedas con puntaje. Los objetivos son los de la metodología (horizonte swing).
 Los umbrales del semáforo (40 / 60 / 75) siguen siendo provisorios.</p>
 {grafico(fig, "g-total")}
 <h3>Pilares, últimos 3 años</h3>{grafico(fig_p, "g-pilares")}
 <h3>Indicadores</h3>{t_ind}
+"""
+
+
+MESES_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
+            "noviembre", "diciembre"]
+
+
+def _bloque_calendario(res: Resultados) -> str:
+    """Pilar 10: próximos eventos y estacionalidad (modulador, no entra al puntaje)."""
+    c = res.calendario
+    if not c:
+        return ""
+    t = c["proximos"].copy()
+    tabla_ev = tabla(t, [("fecha", "Fecha", "fecha"), ("ruedas", "Ruedas que faltan", "int"),
+                         ("evento", "Evento", "texto")]) if not t.empty else "<p>Sin eventos en las próximas semanas.</p>"
+    faltan = {"fed", "cpi", "empleo"} - set(c.get("fuentes_oficiales", []))
+    aviso = ""
+    if faltan:
+        nombres = {"fed": "Fed", "cpi": "CPI", "empleo": "empleo"}
+        aviso = (f'<p class="pie">No se pudo leer el calendario oficial de: {", ".join(nombres[f] for f in sorted(faltan))}. '
+                 "Esas fechas no se muestran (no se inventan).</p>")
+    e = c.get("estacionalidad") or {}
+    est = ""
+    if e.get("anios"):
+        est = (f"<p><strong>Estacionalidad.</strong> En {MESES_ES[e['mes'] - 1]}, el S&amp;P 500 rindió en promedio "
+               f"{fmt(e['mes_medio'], 'pct')} (subió en el {fmt(e['mes_positivo'], 'pct0')} de {e['anios']} años; "
+               f"un mes cualquiera: {fmt(e['todos_medio'], 'pct')}). En las 21 ruedas siguientes a esta fecha: "
+               f"{fmt(e['adelante_medio'], 'pct')} en promedio, positivo el {fmt(e['adelante_positivo'], 'pct0')} "
+               f"de las veces ({e['adelante_n']} años).</p>")
+    return f"""
+<h3>Calendario: próximas 5 semanas</h3>
+<p class="pie">Pilar 10: modula, no suma al puntaje. Vencimientos y fines de mes salen de las reglas de la bolsa; Fed,
+inflación y empleo, de los calendarios oficiales de la Reserva Federal y del BLS.</p>
+{aviso}<div class="dos"><div>{tabla_ev}</div><div>{est}</div></div>
 """
 
 

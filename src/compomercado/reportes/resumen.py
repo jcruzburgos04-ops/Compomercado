@@ -53,6 +53,17 @@ def texto(res: Resultados) -> str:
             L.append(f"  S&P 500 ({res.sp500['n']} empresas actuales, contexto): " + " · ".join(partes))
         L.append("")
 
+    cal = res.calendario
+    if cal and not cal["proximos"].empty:
+        L.append("CALENDARIO (próximas 5 semanas; no suma al puntaje)")
+        for _, f in cal["proximos"].iterrows():
+            L.append(f"  {f['fecha']:%a %d/%m}  en {f['ruedas']:>2} ruedas  {f['evento']}")
+        e = cal.get("estacionalidad") or {}
+        if e.get("anios"):
+            L.append(f"  Estacionalidad del mes: {e['mes_medio']:+.1%} promedio, positivo {e['mes_positivo']:.0%} de "
+                     f"{e['anios']} años · próximas 21 ruedas: {e['adelante_medio']:+.1%}")
+        L.append("")
+
     if vig is not None:
         L.append(f"PONDERACIONES (pesos estimados con datos hasta {vig.hasta:%Y-%m-%d})")
         ti = vig.indicadores

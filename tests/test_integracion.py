@@ -21,6 +21,7 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
     assert res.huellas is not None and len(res.huellas.tramos) >= 1
     assert res.huellas.prob.dropna().between(0, 1).all()
     assert res.sp500["n"] == 120 and 0 < res.sp500["top10"] < 1
+    assert not res.calendario["proximos"].empty and res.calendario["estacionalidad"]["anios"] > 5
     ids = {ind.id for ind in res.indicadores}
     assert {"sp500_pct_200", "sp500_pct_50"} <= ids
     assert "sp500_pct_200" not in res.riesgo.columns   # sesgo de supervivencia: no entra al puntaje
@@ -32,6 +33,7 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
         assert seccion in html
     assert "Argentina" not in html and "CCL" not in html
     assert "Amplitud del S&amp;P 500" in html or "Amplitud del S&P 500" in html
+    assert "Calendario: próximas 5 semanas" in html
     assert "Esta sección falló" not in html
     # Los datos del test son sintéticos: el tablero tiene que avisarlo.
     assert "DATOS DE PRUEBA" in html and "Datos reales descargados" not in html

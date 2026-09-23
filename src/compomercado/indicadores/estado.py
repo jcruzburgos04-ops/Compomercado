@@ -178,8 +178,9 @@ def divergencia_amplitud(p: pd.Series, participacion: pd.Series, h: int = 21, ce
 
 def choque(p: pd.Series, h: int = 21, ventana: int = 252) -> pd.Series:
     """Tamaño del movimiento de h ruedas medido en desvíos de su propia historia (valor absoluto)."""
-    ret = np.log(p).diff(h)
-    sd = np.log(p).diff().rolling(ventana, min_periods=ventana // 2).std() * np.sqrt(h)
+    lp = np.log(p.where(p > 0))   # el WTI cotizó negativo en abril de 2020
+    ret = lp.diff(h)
+    sd = lp.diff().rolling(ventana, min_periods=ventana // 2).std() * np.sqrt(h)
     return (ret / sd).abs()
 
 

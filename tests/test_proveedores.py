@@ -135,6 +135,7 @@ def _xlsx_ssga() -> bytes:
     ws.append(["NVIDIA CORP", "NVDA", "x", "x", 7.5, "Information Technology", 1, "USD"])
     ws.append(["BERKSHIRE HATHAWAY INC CL B", "BRK.B", "x", "x", 1.6, "Financials", 1, "USD"])
     ws.append(["US DOLLAR", "CASH_USD", "x", "x", 0.1, "-", 1, "USD"])
+    ws.append(["EMPRESA ESCINDIDA", "2602335D", "x", "x", 0.01, "-", 1, "USD"])
     ws.append([])
     ws.append(["Past performance is no guarantee of future results."])
     buf = io.BytesIO()
@@ -159,3 +160,28 @@ def test_parser_wikipedia_sp500():
             "<tr><td>AAPL</td><td>Apple</td><td>Information Technology</td></tr></table>")
     t = sp500.parsear_wikipedia(html)
     assert list(t["ticker"]) == ["BF-B", "AAPL"] and t["peso"].isna().all()
+
+
+def test_parser_fomc():
+    from compomercado.datos.proveedores import calendario as cal
+
+    html = """<h4><a>2026 FOMC Meetings</a></h4>
+    <div class="fomc-meeting__month"><strong>January</strong></div><div class="fomc-meeting__date">27-28</div>
+    <p>Minutes: Released February 18, 2026</p>
+    <div class="fomc-meeting__month"><strong>April/May</strong></div><div class="fomc-meeting__date">28-1*</div>
+    <div class="fomc-meeting__month"><strong>December</strong></div><div class="fomc-meeting__date">8-9*</div>
+    <h4><a>2025 FOMC Meetings</a></h4>
+    <div class="fomc-meeting__month"><strong>September</strong></div><div class="fomc-meeting__date">16-17*</div>"""
+    t = cal.parsear_fomc(html)
+    assert list(t["fecha"]) == [pd.Timestamp("2025-09-17"), pd.Timestamp("2026-01-28"),
+                                pd.Timestamp("2026-05-01"), pd.Timestamp("2026-12-09")]
+
+
+def test_parser_bls_solo_tablas():
+    from compomercado.datos.proveedores import calendario as cal
+
+    html = """<p>Last Modified Date: Jan 10, 2026</p><table><tr><th>Reference Month</th><th>Release Date</th></tr>
+    <tr><td>September 2026</td><td>Oct. 15, 2026</td><td>08:30 AM</td></tr>
+    <tr><td>October 2026</td><td>Nov. 12, 2026</td><td>08:30 AM</td></tr></table>"""
+    t = cal.parsear_bls(html, "cpi")
+    assert list(t["fecha"]) == [pd.Timestamp("2026-10-15"), pd.Timestamp("2026-11-12")]

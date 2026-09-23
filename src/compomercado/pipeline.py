@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import registro
-from .analitica import canastas, huellas
+from .analitica import calendario, canastas, huellas
 from .analitica import comportamiento as comp
 from .config import Proyecto
 from .datos.series import Series
@@ -77,6 +77,7 @@ class Resultados:
     umbral_tramos: float = 0.05
     huellas: huellas.Huellas | None = None
     sp500: dict = field(default_factory=dict)
+    calendario: dict = field(default_factory=dict)
 
 
 def _nombre_canasta(nombre: str) -> str:
@@ -167,6 +168,7 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         huellas_spy = huellas.analizar(mapas["SPY"].episodios, riesgo, pilares_igual, pilares["total"], spy)
 
     sp500_info = _sp500(S)
+    calendario_info = _calendario(proyecto, S, fecha)
 
     # --- correlaciones actuales ---------------------------------------------------------------
     corr_cols = [t for t in CORRELACION if t in precios.columns]
@@ -232,6 +234,7 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         umbral_tramos=umbral,
         huellas=huellas_spy,
         sp500=sp500_info,
+        calendario=calendario_info,
     )
 
 
@@ -278,3 +281,15 @@ def _sp500(S: Series) -> dict:
         salida["top10"] = float(top["peso"].sum())
         salida["top10_nombres"] = [f"{t} {p:.1%}" for t, p in zip(top["ticker"], top["peso"], strict=True)]
     return salida
+
+
+def _calendario(proyecto: Proyecto, S: Series, fecha: pd.Timestamp) -> dict:
+    """Próximos eventos (reglas de la bolsa + calendarios oficiales) y estacionalidad del S&P 500."""
+    ruta = proyecto.dir_datos / "calendario_eventos.csv"
+    oficiales = pd.read_csv(ruta, parse_dates=["fecha"]) if ruta.exists() else pd.DataFrame()
+    indice = S.precio("^GSPC")
+    if indice.empty:
+        indice = S.precio("SPY")
+    return {"proximos": calendario.proximos(fecha, oficiales, dias=35),
+            "estacionalidad": calendario.estacionalidad(indice, fecha),
+            "fuentes_oficiales": sorted(set(oficiales["tipo"])) if not oficiales.empty else []}

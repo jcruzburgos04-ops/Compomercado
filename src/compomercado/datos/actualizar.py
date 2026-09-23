@@ -9,6 +9,7 @@ import pandas as pd
 from ..config import Proyecto
 from .almacen import Almacen
 from .calidad import reporte_precios
+from .proveedores import calendario as calendario_oficial
 from .proveedores import cboe, fred, french, sp500, yahoo
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,13 @@ def actualizar_todo(proyecto: Proyecto) -> dict[str, list[str]]:
             fallos["ken_french"].append(nombre)
     alm.registrar_descarga("ken_french", origen="descarga", url="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/",
                            series=len(proyecto.ken_french), fallidos=fallos["ken_french"])
+
+    eventos, fallidas_cal = calendario_oficial.descargar()
+    if not eventos.empty:
+        eventos.to_csv(proyecto.dir_datos / "calendario_eventos.csv", index=False)
+        alm.registrar_descarga("calendario", origen="descarga", url="federalreserve.gov, bls.gov",
+                               eventos=len(eventos), fallidos=fallidas_cal)
+    fallos["calendario"] = fallidas_cal
 
     cierre = alm.precios("cierre_aj")
     if "SPY" in cierre.columns:

@@ -45,7 +45,8 @@ def parsear_ssga(contenido: bytes) -> pd.DataFrame:
     tabla.columns = [str(c).strip() for c in crudo.iloc[fila]]
     tabla["peso"] = pd.to_numeric(tabla.get("Weight"), errors="coerce") / 100
     tabla = tabla[tabla["Ticker"].notna() & tabla["peso"].notna() & (tabla["peso"] > 0)]
-    tabla = tabla[~tabla["Ticker"].astype(str).str.contains("CASH|USD|^-$", regex=True)]
+    # Solo símbolos bursátiles (descarta efectivo, futuros y códigos internos como "2602335D").
+    tabla = tabla[tabla["Ticker"].astype(str).str.strip().str.fullmatch(r"[A-Za-z]{1,5}([.\- ][A-Za-z])?")]
     salida = pd.DataFrame({
         "ticker": [a_yahoo(t) for t in tabla["Ticker"]],
         "nombre": tabla.get("Name", pd.Series("", index=tabla.index)).astype(str).to_numpy(),
