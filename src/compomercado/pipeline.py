@@ -76,6 +76,7 @@ class Resultados:
     ultimas_fechas: dict = field(default_factory=dict)
     umbral_tramos: float = 0.05
     huellas: huellas.Huellas | None = None
+    sp500: dict = field(default_factory=dict)
 
 
 def _nombre_canasta(nombre: str) -> str:
@@ -165,6 +166,8 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
     if "SPY" in mapas and "total" in pilares:
         huellas_spy = huellas.analizar(mapas["SPY"].episodios, riesgo, pilares_igual, pilares["total"], spy)
 
+    sp500_info = _sp500(S)
+
     # --- correlaciones actuales ---------------------------------------------------------------
     corr_cols = [t for t in CORRELACION if t in precios.columns]
     correlacion = precios[corr_cols].pct_change().tail(63).corr()
@@ -182,6 +185,8 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
             valores.update({f"pond_{k}": _ultimo(pond.pilares[k]) for k in pond.pilares.columns})
         if huellas_spy is not None:
             valores["analogos_prob"] = huellas_spy.vecinos_hoy.get("prob", np.nan)
+        if sp500_info.get("top10") is not None:
+            valores["sp500_top10"] = sp500_info["top10"]
         valores["spy_cierre"] = _ultimo(precios["SPY"])
         if registro.agregar(proyecto.dir_registro, "estado_diario.csv", fecha, valores):
             log.info("Registro forward: fila %s agregada", fecha.date())
@@ -226,6 +231,7 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         ultimas_fechas=_ultimas_fechas(S),
         umbral_tramos=umbral,
         huellas=huellas_spy,
+        sp500=sp500_info,
     )
 
 
@@ -258,3 +264,17 @@ def _opciones_validas(o: pd.DataFrame) -> pd.DataFrame:
 def _ultimo(s: pd.Series) -> float:
     s = s.dropna()
     return float(s.iloc[-1]) if len(s) else np.nan
+
+
+def _sp500(S: Series) -> dict:
+    """Resumen de los componentes actuales del S&P 500: fuente, cantidad y concentración del top 10."""
+    comp = S.sp500_componentes()
+    if comp.empty:
+        return {}
+    salida = {"n": len(comp), "fuente": str(comp["fuente"].iloc[0]), "fecha": pd.Timestamp(comp["fecha"].iloc[0]),
+              "top10": None, "top10_nombres": []}
+    if comp["peso"].notna().sum() >= 10:
+        top = comp.nlargest(10, "peso")
+        salida["top10"] = float(top["peso"].sum())
+        salida["top10_nombres"] = [f"{t} {p:.1%}" for t, p in zip(top["ticker"], top["peso"], strict=True)]
+    return salida

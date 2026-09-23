@@ -44,6 +44,13 @@ def texto(res: Resultados) -> str:
         fmt = lambda k: f"{ids[k].nombre} p{ult[k]:.0f}"  # noqa: E731
         L.append("  Empujan: " + "; ".join(fmt(k) for k in ult.index[::-1][:5]))
         L.append("  Calman:  " + "; ".join(fmt(k) for k in ult.index[:5]))
+        ind_sp = {i.id: i.serie.dropna() for i in res.indicadores if i.id.startswith("sp500_")}
+        if res.sp500 and ind_sp:
+            partes = [f"{ind_sp[k].iloc[-1]:.0%} sobre la media de {h}" for k, h in
+                      (("sp500_pct_200", 200), ("sp500_pct_50", 50)) if k in ind_sp and len(ind_sp[k])]
+            if res.sp500.get("top10") is not None:
+                partes.append(f"top 10 = {res.sp500['top10']:.0%} del índice")
+            L.append(f"  S&P 500 ({res.sp500['n']} empresas actuales, contexto): " + " · ".join(partes))
         L.append("")
 
     if vig is not None:

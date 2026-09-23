@@ -170,6 +170,10 @@ fred:
 # Series CBOE (fuente primaria de la familia VIX; Yahoo queda como respaldo).
 cboe: [VIX, VIX9D, VIX3M, VIX6M, VVIX, SKEW, VXN, RVX, OVX, GVZ]
 
+# Amplitud sobre los componentes actuales del S&P 500 (tenencias de SPY publicadas por State Street).
+# Tiene sesgo de supervivencia: sirve para leer la amplitud de hoy, no para backtestear.
+sp500: {activo: true}
+
 # Historia larga sin sesgo de supervivencia.
 ken_french:
   - 49_Industry_Portfolios_daily

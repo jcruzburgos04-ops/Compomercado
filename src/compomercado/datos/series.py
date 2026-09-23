@@ -42,6 +42,18 @@ class Series:
         union = c.index.union(cal)
         return c.reindex(union).ffill(limit=limite_ffill).reindex(cal)
 
+    def sp500(self, limite_ffill: int = 5) -> pd.DataFrame:
+        """Cierres ajustados de los componentes actuales del S&P 500 en ruedas de EE. UU. (vacío si no hay)."""
+        c = self._tabla("sp500/cierre_aj")
+        if c.empty:
+            return c
+        cal = self.calendario
+        return c.reindex(c.index.union(cal)).ffill(limit=limite_ffill).reindex(cal)
+
+    def sp500_componentes(self) -> pd.DataFrame:
+        ruta = self.p.dir_datos / "sp500_componentes.csv"
+        return pd.read_csv(ruta, parse_dates=["fecha"]) if ruta.exists() else pd.DataFrame()
+
     # --- volatilidad (CBOE primario, Yahoo respaldo) ---------------------
     def vol(self, sym: str) -> pd.Series:
         """Serie de la familia VIX: CBOE, completada con Yahoo (^SYM) donde falte."""

@@ -131,6 +131,10 @@ class Proyecto:
         return list(self.universos.get("cboe", []) or [])
 
     @property
+    def sp500_activo(self) -> bool:
+        return bool((self.universos.get("sp500") or {}).get("activo", False))
+
+    @property
     def ken_french(self) -> list[str]:
         return list(self.universos.get("ken_french", []) or [])
 

@@ -118,3 +118,44 @@ def test_opciones_validas_ignora_snapshots_sin_spot():
                       "QQQ_iv_atm_30": [0.2, 0.21]}, index=pd.to_datetime(["2026-09-22", "2026-09-23"]))
     v = _opciones_validas(o)
     assert np.isnan(v.loc["2026-09-22", "SPY_iv_atm_30"]) and v.loc["2026-09-22", "QQQ_iv_atm_30"] == 0.2
+
+
+def _xlsx_ssga() -> bytes:
+    import io
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Fund Name:", "SPDR S&P 500 ETF Trust"])
+    ws.append(["Ticker Symbol:", "SPY"])
+    ws.append(["Holdings:", "As of 22-Sep-2026"])
+    ws.append([])
+    ws.append(["Name", "Ticker", "Identifier", "SEDOL", "Weight", "Sector", "Shares Held", "Local Currency"])
+    ws.append(["NVIDIA CORP", "NVDA", "x", "x", 7.5, "Information Technology", 1, "USD"])
+    ws.append(["BERKSHIRE HATHAWAY INC CL B", "BRK.B", "x", "x", 1.6, "Financials", 1, "USD"])
+    ws.append(["US DOLLAR", "CASH_USD", "x", "x", 0.1, "-", 1, "USD"])
+    ws.append([])
+    ws.append(["Past performance is no guarantee of future results."])
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_parser_ssga_spy():
+    from compomercado.datos.proveedores import sp500
+
+    t = sp500.parsear_ssga(_xlsx_ssga())
+    assert list(t["ticker"]) == ["NVDA", "BRK-B"]
+    assert abs(t["peso"].iloc[0] - 0.075) < 1e-12
+    assert t["fecha"].iloc[0] == pd.Timestamp("2026-09-22")
+
+
+def test_parser_wikipedia_sp500():
+    from compomercado.datos.proveedores import sp500
+
+    html = ("<table><tr><th>Symbol</th><th>Security</th><th>GICS Sector</th></tr>"
+            "<tr><td>BF.B</td><td>Brown-Forman</td><td>Consumer Staples</td></tr>"
+            "<tr><td>AAPL</td><td>Apple</td><td>Information Technology</td></tr></table>")
+    t = sp500.parsear_wikipedia(html)
+    assert list(t["ticker"]) == ["BF-B", "AAPL"] and t["peso"].isna().all()

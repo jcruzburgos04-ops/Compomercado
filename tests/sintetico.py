@@ -59,7 +59,13 @@ def crear(tmp: Path, inicio="2012-01-02", fin="2026-09-18", semilla=0) -> Proyec
     alm.guardar("french/49_Industry_Portfolios_daily", ind)
     alm.guardar("french/F-F_Research_Data_Factors_daily",
                 pd.DataFrame({"Mkt-RF": rff, "SMB": 0.0, "HML": 0.0, "RF": 0.0001}, index=fechas_ff))
-    for fuente in ("yahoo", "fred", "cboe", "ken_french"):
+    # Componentes del S&P 500 (120 acciones con beta variable).
+    sp = {f"A{k:03d}": 100 * np.cumprod(1 + (0.5 + k / 120) * rm + rng.normal(0, 0.012, n)) for k in range(120)}
+    alm.guardar("sp500/cierre_aj", pd.DataFrame(sp, index=fechas))
+    pesos = np.linspace(2, 0.1, 120)
+    pd.DataFrame({"ticker": list(sp), "nombre": list(sp), "sector": "X", "peso": pesos / pesos.sum(),
+                  "fecha": fechas[-1], "fuente": "prueba"}).to_csv(p.dir_datos / "sp500_componentes.csv", index=False)
+    for fuente in ("yahoo", "fred", "cboe", "ken_french", "sp500"):
         alm.registrar_descarga(fuente, origen="sintetico", fallidos=[])
     reporte_precios(cierre, pd.DatetimeIndex(fechas), set()).to_csv(p.dir_datos / "calidad_precios.csv")
     return p

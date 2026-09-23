@@ -9,7 +9,7 @@ import pandas as pd
 from ..config import Proyecto
 from .almacen import Almacen
 from .calidad import reporte_precios
-from .proveedores import cboe, fred, french, yahoo
+from .proveedores import cboe, fred, french, sp500, yahoo
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +26,9 @@ def actualizar_todo(proyecto: Proyecto) -> dict[str, list[str]]:
         alm.guardar(f"precios/{campo}", tabla)
     alm.registrar_descarga("yahoo", origen="descarga", url="Yahoo Finance (yfinance)", tickers=len(tickers), fallidos=fallidos)
     fallos["yahoo"] = fallidos
+
+    if proyecto.sp500_activo:
+        fallos["sp500"] = actualizar_sp500(proyecto, alm)
 
     series = list(proyecto.series_fred)
     log.info("FRED: %d series", len(series))
@@ -59,3 +62,21 @@ def actualizar_todo(proyecto: Proyecto) -> dict[str, list[str]]:
         reporte_precios(cierre, calendario, asinc).to_csv(proyecto.dir_datos / "calidad_precios.csv")
 
     return fallos
+
+
+def actualizar_sp500(proyecto: Proyecto, alm: Almacen) -> list[str]:
+    """Componentes actuales del S&P 500 y sus precios. Devuelve los tickers que fallaron."""
+    comp = sp500.componentes()
+    if comp.empty:
+        log.warning("S&P 500: no se pudieron obtener los componentes")
+        return ["componentes"]
+    comp.to_csv(proyecto.dir_datos / "sp500_componentes.csv", index=False)
+    tickers = list(comp["ticker"])
+    log.info("S&P 500: %d componentes (%s)", len(tickers), comp["fuente"].iloc[0])
+    tablas, fallidos = yahoo.descargar(tickers)
+    for campo in ("cierre_aj", "volumen"):
+        if campo in tablas:
+            alm.guardar(f"sp500/{campo}", tablas[campo])
+    alm.registrar_descarga("sp500", origen="descarga", url=comp["fuente"].iloc[0], tickers=len(tickers),
+                           fallidos=fallidos)
+    return fallidos

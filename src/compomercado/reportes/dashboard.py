@@ -308,12 +308,50 @@ def seccion_estado(res: Resultados) -> str:
   </div>
 </div>
 <h3>Pilares</h3>{t_pilares}
+{_bloque_sp500(res)}
 <h3>Qué pasó después, según el nivel del puntaje</h3>{t_base}
 <p class="pie">Base: todas las ruedas con puntaje. Los objetivos son los de la metodología (horizonte swing).
 Los umbrales del semáforo (40 / 60 / 75) siguen siendo provisorios.</p>
 {grafico(fig, "g-total")}
 <h3>Pilares, últimos 3 años</h3>{grafico(fig_p, "g-pilares")}
 <h3>Indicadores</h3>{t_ind}
+"""
+
+
+def _bloque_sp500(res: Resultados) -> str:
+    """Amplitud medida sobre las empresas que forman hoy el S&P 500 (solo contexto)."""
+    info = res.sp500
+    ids = {i.id: i for i in res.indicadores}
+    claves = [k for k in ("sp500_pct_200", "sp500_pct_50", "sp500_max_min", "sp500_mcclellan") if k in ids]
+    if not info or not claves:
+        return ""
+    filas = []
+    for k in claves:
+        s = ids[k].serie.dropna()
+        filas.append({"nombre": ids[k].nombre.replace("S&P 500: ", ""), "hoy": fmt(s.iloc[-1], ids[k].formato),
+                      "hace5": fmt(s.iloc[-6], ids[k].formato) if len(s) > 5 else "—",
+                      "mediana": fmt(s.tail(252 * 5).median(), ids[k].formato)})
+    t = tabla(pd.DataFrame(filas), [("nombre", "Medida", "texto"), ("hoy", "Hoy", "texto"),
+                                    ("hace5", "Hace 5 ruedas", "texto"), ("mediana", "Mediana 5 años", "texto")])
+    fig = go.Figure()
+    for k, color in (("sp500_pct_200", AZUL), ("sp500_pct_50", NARANJA)):
+        if k in ids:
+            s = ids[k].serie.dropna()
+            s = s.loc[s.index[-1] - pd.DateOffset(years=5):]
+            fig.add_trace(go.Scatter(x=s.index, y=s, name=ids[k].nombre.replace("S&P 500: ", ""),
+                                     line=dict(color=color, width=1.5), hovertemplate="%{y:.0%}"))
+    fig.update_yaxes(tickformat=".0%", range=[0, 1])
+    fig = _layout(fig, 280, leyenda=True)
+    top = ""
+    if info.get("top10") is not None:
+        top = (f"<p>Concentración: las 10 empresas más grandes pesan <strong>{info['top10']:.0%}</strong> del índice "
+               f"({html.escape(', '.join(info['top10_nombres']))}).</p>")
+    return f"""
+<h3>Amplitud del S&P 500</h3>
+<p class="pie">Calculada sobre las {info['n']} empresas que forman hoy el índice ({html.escape(info['fuente'])},
+{info['fecha']:%d/%m/%Y}). Sirve para leer la amplitud de hoy; la historia tiene sesgo de supervivencia (faltan las
+que salieron del índice), por eso no entra al puntaje.</p>
+{top}<div class="dos"><div>{t}</div><div>{grafico(fig, "g-sp500")}</div></div>
 """
 
 

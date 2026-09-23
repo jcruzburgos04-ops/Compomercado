@@ -280,6 +280,18 @@ def calcular(S: Series) -> list[Indicador]:
             lambda: pd.concat([rel(col(t), spy, 63) for t in CANARIOS if t in c.columns], axis=1).mean(axis=1),
             "pct", "Promedio de semis, bancos regionales, transporte, retail y constructoras")
 
+    # Amplitud sobre los componentes actuales del S&P 500: solo contexto (sesgo de supervivencia).
+    sp = S.sp500()
+    if sp.shape[1] >= 100:
+        nota = "Componentes actuales del S&P 500: la historia tiene sesgo de supervivencia, no entra al puntaje"
+        agregar("sp500_pct_200", "S&P 500: % sobre media 200", "amplitud", 0, lambda: pct_sobre_media(sp, 200, 100),
+                "pct", nota)
+        agregar("sp500_pct_50", "S&P 500: % sobre media 50", "amplitud", 0, lambda: pct_sobre_media(sp, 50, 100),
+                "pct", nota)
+        agregar("sp500_mcclellan", "S&P 500: McClellan", "amplitud", 0, lambda: mcclellan(sp, 100), desc=nota)
+        agregar("sp500_max_min", "S&P 500: máximos − mínimos 52 sem.", "amplitud", 0,
+                lambda: maximos_minimos(sp, minimo=100), "pct", nota)
+
     # Crédito
     agregar("hyg_ief", "High yield vs Tesoro (HYG/IEF 21d)", "credito", -1, lambda: rel(col("HYG"), col("IEF"), 21), "pct")
     agregar("baa10y", "Spread Baa − 10a", "credito", +1, lambda: S.fred("BAA10Y"))
