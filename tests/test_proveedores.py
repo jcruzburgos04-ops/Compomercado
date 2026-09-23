@@ -91,3 +91,16 @@ def test_completar_ajustado_ultima_rueda():
     }
     yahoo.completar_ajustado(tablas)
     assert tablas["cierre_aj"]["SPY"].iloc[-1] == 102.0
+
+
+def test_agregar_recientes_superpone_ultima_rueda(monkeypatch):
+    idx_largo = pd.bdate_range("2024-01-01", periods=3)
+    idx_corto = pd.bdate_range("2024-01-02", periods=3)
+    tablas = {"cierre": pd.DataFrame({"SPY": [1.0, 2.0, 3.0]}, index=idx_largo)}
+    corto = pd.DataFrame({("Close", "SPY"): [2.5, 3.5, 4.5]}, index=idx_corto)
+    corto.columns = pd.MultiIndex.from_tuples(corto.columns)
+    monkeypatch.setattr(yahoo, "_descargar_lote", lambda *a, **k: corto)
+    monkeypatch.setattr(yahoo, "quitar_barra_incompleta", lambda df, ahora=None: df)
+    yahoo._agregar_recientes(tablas, ["SPY"], 40, 1, 0)
+    s = tablas["cierre"]["SPY"]
+    assert list(s.values) == [1.0, 2.5, 3.5, 4.5]

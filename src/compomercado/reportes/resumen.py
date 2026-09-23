@@ -34,14 +34,23 @@ def texto(res: Resultados) -> str:
     spy = res.mapas.get("SPY")
     if spy is not None:
         tb = spy.tabla[(spy.tabla["frecuencia"] == "diaria") & ~spy.tabla.index.str.startswith("^")]
+        acciones = tb[tb["grupo"].isin(["sectores", "industrias", "factores", "global_etf", "referencias", "canasta"])]
+        fuera = tb[tb["grupo"].isin(["renta_fija", "commodities", "divisas", "cripto"])]
         cols = ["puntaje_refugio", "captura_mediana", "acierto_defensivo", "beta_bajista", "rs_63_pct"]
         L.append(f"MAPA VS SPY ({len(spy.episodios)} tramos ≥10% desde {spy.episodios['pico'].min():%Y})")
         L.append("  Refugio   captura  acierto  beta↓  RS63   activo")
-        for tk, f in tb.sort_values("puntaje_refugio", ascending=False)[cols].head(12).iterrows():
-            L.append(f"  {f.puntaje_refugio:6.0f}   {f.captura_mediana:6.2f}   {f.acierto_defensivo:6.0%}  {f.beta_bajista:5.2f}  {f.rs_63_pct:4.0f}   {tk} {res.nombres.get(tk, '')}")
-        L.append("  ...")
-        for tk, f in tb.sort_values("puntaje_refugio", ascending=True)[cols].head(6).iloc[::-1].iterrows():
-            L.append(f"  {f.puntaje_refugio:6.0f}   {f.captura_mediana:6.2f}   {f.acierto_defensivo:6.0%}  {f.beta_bajista:5.2f}  {f.rs_63_pct:4.0f}   {tk} {res.nombres.get(tk, '')}")
+
+        def filas(d):
+            for tk, f in d[cols].iterrows():
+                L.append(f"  {f.puntaje_refugio:6.0f}   {f.captura_mediana:6.2f}   {f.acierto_defensivo:6.0%}  "
+                         f"{f.beta_bajista:5.2f}  {f.rs_63_pct:4.0f}   {tk} {res.nombres.get(tk, '')}")
+
+        L.append("  Acciones, mejores refugios:")
+        filas(acciones.sort_values("puntaje_refugio", ascending=False).head(10))
+        L.append("  Acciones, lo que más cae:")
+        filas(acciones.sort_values("puntaje_refugio").head(6).iloc[::-1])
+        L.append("  Fuera de acciones:")
+        filas(fuera.sort_values("puntaje_refugio", ascending=False).head(6))
         L.append("")
         L.append("ÚLTIMOS TRAMOS DE CAÍDA DE SPY")
         for _, e in spy.episodios.sort_values("pico").tail(6).iterrows():

@@ -22,8 +22,8 @@ caidas:
 # Reglas (tentativas) para clasificar el tipo de caída según su huella macro.
 # Se evalúan en orden; la primera que se cumple define el tipo.
 tipos_caida:
+  - {tipo: "Pánico de liquidez", condicion: "dias_caida <= 35 and vix_max >= 35"}
   - {tipo: "Crédito / recesión", condicion: "d_baa10y >= 0.50"}
-  - {tipo: "Pánico de liquidez", condicion: "dias_caida <= 25 and vix_max >= 35"}
   - {tipo: "Tasas / inflación", condicion: "d_dgs10 >= 0.30"}
   - {tipo: "Crecimiento", condicion: "d_dgs10 <= -0.30"}
   - {tipo: "Otro", condicion: "True"}

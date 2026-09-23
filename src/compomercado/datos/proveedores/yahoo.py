@@ -23,7 +23,7 @@ CAMPOS = {
 NY = ZoneInfo("America/New_York")
 
 
-def _descargar_lote(tickers: list[str], reintentos: int, pausa: float) -> pd.DataFrame:
+def _descargar_lote(tickers: list[str], reintentos: int, pausa: float, periodo: str = "max") -> pd.DataFrame:
     import yfinance as yf
 
     ultimo_error: Exception | None = None
@@ -31,7 +31,7 @@ def _descargar_lote(tickers: list[str], reintentos: int, pausa: float) -> pd.Dat
         try:
             df = yf.download(
                 tickers,
-                period="max",
+                period=periodo,
                 interval="1d",
                 auto_adjust=False,
                 actions=False,
@@ -117,10 +117,29 @@ def descargar(
                     tablas[campo] = tablas.get(campo, pd.DataFrame()).join(tabla[[t]], how="outer")
         fallidos = [t for t in fallidos if t not in recuperados]
 
+    _agregar_recientes(tablas, tickers, lote, reintentos, pausa)
     completar_ajustado(tablas)
     if "cierre" in tablas and "SPY" in tablas["cierre"].columns:
         log.info("Yahoo: última rueda de SPY %s", tablas["cierre"]["SPY"].last_valid_index())
     return tablas, fallidos
+
+
+def _agregar_recientes(tablas: dict[str, pd.DataFrame], tickers: list[str], lote: int, reintentos: int,
+                       pausa: float) -> None:
+    """Superpone una consulta de los últimos 5 días al historial largo.
+
+    El historial con period="max" puede llegar con un día de atraso; la consulta corta trae la
+    última rueda. Donde ambas tienen dato, manda la corta (mismos ajustes vigentes).
+    """
+    for i in range(0, len(tickers), lote):
+        campos = _separar_campos(_descargar_lote(tickers[i : i + lote], reintentos, pausa, periodo="5d"))
+        for campo, reciente in campos.items():
+            if campo not in tablas or reciente.empty:
+                continue
+            reciente.index = pd.DatetimeIndex(reciente.index).tz_localize(None).normalize()
+            reciente = quitar_barra_incompleta(reciente[~reciente.index.duplicated(keep="last")])
+            reciente = reciente.reindex(columns=[c for c in reciente.columns if c in tablas[campo].columns])
+            tablas[campo] = reciente.combine_first(tablas[campo])
 
 
 def completar_ajustado(tablas: dict[str, pd.DataFrame]) -> None:

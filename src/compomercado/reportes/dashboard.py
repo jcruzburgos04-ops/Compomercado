@@ -332,22 +332,38 @@ def seccion_mapa(res: Resultados) -> str:
         t = spy.tabla
         # Solo instrumentos operables y medidos con datos diarios (sin índices "^").
         mask_sinc = (t["frecuencia"] == "diaria") & ~t.index.str.startswith("^")
-        refugios = t[mask_sinc & (t["puntaje_refugio"] >= 60) & (t["rs_63_pct"] >= 50)].sort_values("puntaje_refugio", ascending=False).head(12)
-        umbral_beta = t.loc[mask_sinc, "beta_bajista"].quantile(0.75)
-        reducir = t[mask_sinc & (t["beta_bajista"] >= umbral_beta) & (t["rs_63_pct"] < 50)].sort_values("beta_bajista", ascending=False).head(12)
-        for d in (refugios, reducir):
+        acciones = t["grupo"].isin(["sectores", "industrias", "factores", "global_etf", "referencias", "canasta"])
+        fuera = t["grupo"].isin(["renta_fija", "commodities", "divisas", "cripto"])
+        # Refugio y fuerza relativa se rankean dentro de cada clase: comparar bonos con acciones
+        # llena la lista de bonos, y para rotar dentro de la renta variable eso no sirve.
+        def rango_clase(mask):
+            d = t[mask_sinc & mask].copy()
+            d["ref_clase"] = d["puntaje_refugio"].rank(pct=True) * 100
+            d["rs_clase"] = d["rs_63"].rank(pct=True) * 100 if "rs_63" in d else np.nan
             d["nombre"] = [res.nombres.get(i, i) for i in d.index]
-        cols_r = [("__indice__", "Activo", "texto"), ("nombre", "Nombre", "texto"), ("puntaje_refugio", "Refugio", "puntaje"),
-                  ("rs_63_pct", "Fuerza rel. 63d", "puntaje"), ("acierto_defensivo", "Acierto", "pct0")]
+            return d
+
+        acc, otros = rango_clase(acciones), rango_clase(fuera)
+        ref_acc = acc[(acc["ref_clase"] >= 60) & (acc["rs_clase"] >= 50)].sort_values("ref_clase", ascending=False).head(12)
+        ref_otros = otros[(otros["ref_clase"] >= 50)].sort_values("rs_clase", ascending=False).head(8)
+        umbral_beta = acc["beta_bajista"].quantile(0.75)
+        reducir = acc[(acc["beta_bajista"] >= umbral_beta) & (acc["rs_clase"] < 50)].sort_values("beta_bajista", ascending=False).head(12)
+        cols_r = [("__indice__", "Activo", "texto"), ("nombre", "Nombre", "texto"),
+                  ("ref_clase", "Refugio (en su clase)", "puntaje"), ("rs_clase", "Fuerza rel. 63d (en su clase)", "puntaje"),
+                  ("captura_mediana", "Captura mediana", "num"), ("acierto_defensivo", "Acierto", "pct0")]
         cols_d = [("__indice__", "Activo", "texto"), ("nombre", "Nombre", "texto"), ("beta_bajista", "Beta ↓", "num"),
-                  ("rs_63_pct", "Fuerza rel. 63d", "puntaje"), ("captura_mediana", "Captura mediana", "num")]
+                  ("rs_clase", "Fuerza rel. 63d (en su clase)", "puntaje"), ("captura_mediana", "Captura mediana", "num")]
         extras += f"""
 <div class="dos">
-  <div><h3>Refugios con fuerza hoy</h3><p class="pie">Refugio ≥ 60 y fuerza relativa de 63 ruedas ≥ percentil 50:
-  aguantaron las caídas y hoy no se están cayendo.</p>{tabla(refugios, cols_r)}</div>
-  <div><h3>Reducir primero si sube el riesgo</h3><p class="pie">Beta bajista en el cuartil superior y fuerza
-  relativa débil. Los líderes con fuerza no aparecen acá.</p>{tabla(reducir, cols_d)}</div>
-</div>"""
+  <div><h3>Rotar dentro de acciones: refugios con fuerza hoy</h3><p class="pie">Sectores, industrias, factores y
+  países en el 40 % superior de refugio de las acciones, con fuerza relativa de 63 ruedas en la mitad superior.</p>{tabla(ref_acc, cols_r)}</div>
+  <div><h3>Reducir primero si sube el riesgo</h3><p class="pie">Acciones con beta bajista en el cuartil superior y
+  fuerza relativa débil. Los líderes con fuerza no aparecen acá.</p>{tabla(reducir, cols_d)}</div>
+</div>
+<h3>Refugios fuera de acciones</h3><p class="pie">Bonos, oro, commodities y divisas con buen historial en las caídas,
+ordenados por fuerza relativa actual. Mirar la correlación acciones-bonos (pestaña Correlaciones): si es positiva,
+los bonos cubren menos.</p>{tabla(ref_otros, cols_r)}
+"""
         if not spy.por_tipo.empty:
             pt = spy.por_tipo.copy()
             pt = pt[pt.index.isin(t.index[t["grupo"].isin(["sectores", "factores", "renta_fija", "commodities", "industrias"])])]
