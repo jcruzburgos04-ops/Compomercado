@@ -56,6 +56,7 @@ CAMBIO = 21               # el vector de estado incluye el cambio del total en 2
 SEPARACION = 63           # ruedas mínimas entre dos análogos que se muestran
 EXCLUIR_RECIENTES = 126   # para listar análogos históricos: se ignora el último semestre
 PRIMER_ANIO = 2005        # igual que la ponderación, para comparar en los mismos años
+RUEDAS_CALMA = 63         # un tramo "empieza desde la calma" si su pico llega 63+ ruedas después del valle anterior
 
 
 # --- instantáneas por momento --------------------------------------------------------------------
@@ -80,6 +81,21 @@ def instantaneas(eps: pd.DataFrame, X: pd.DataFrame) -> dict[str, pd.DataFrame]:
         valores[ok] = arr[pos[ok]]
         salida[m] = pd.DataFrame(valores, index=eps.index, columns=X.columns)
     return salida
+
+
+def desde_la_calma(eps: pd.DataFrame, indice: pd.DatetimeIndex, ruedas: int = RUEDAS_CALMA) -> pd.Series:
+    """True si el pico llega al menos `ruedas` después del valle del tramo anterior (o si es el primero).
+
+    Separa las caídas que arrancan con el mercado tranquilo de las que son una pierna más dentro de
+    una racha (2008, 2022): en éstas el estrés previo es herencia de la caída anterior.
+    """
+    if eps.empty:
+        return pd.Series(dtype=bool)
+    orden = eps.sort_values("pico")
+    picos = posiciones(orden, indice, "pico")
+    valles = posiciones(orden, indice, "valle")
+    previo = np.concatenate([[-10 ** 9], valles[:-1]])
+    return pd.Series(picos - previo >= ruedas, index=orden.index).reindex(eps.index)
 
 
 def benjamini_hochberg(p: pd.Series) -> pd.Series:
@@ -325,6 +341,7 @@ class Huellas:
     caidas_parecidas: pd.DataFrame
     fecha: pd.Timestamp | None = None
     vecinos_hoy: dict = field(default_factory=dict)
+    lectura_calma: pd.DataFrame = field(default_factory=pd.DataFrame)  # solo tramos que arrancan desde la calma
 
 
 def _por_tipo(snaps: dict[str, pd.DataFrame], tramos: pd.DataFrame, pilares: list[str]) -> pd.DataFrame:
@@ -352,12 +369,16 @@ def analizar(eps: pd.DataFrame, riesgo: pd.DataFrame, pilares_igual: pd.DataFram
     snaps = instantaneas(eps, X)
     # Solo cuentan los tramos con el puntaje total disponible una semana antes del pico.
     con_datos = snaps["pre5"][PREFIJO_PILAR + "total"].notna() if PREFIJO_PILAR + "total" in X else pd.Series(False, index=eps.index)
-    tramos = eps.loc[con_datos]
+    tramos = eps.loc[con_datos].copy()
     snaps = {m: s.loc[con_datos] for m, s in snaps.items()}
     if len(tramos) < MIN_TRAMOS:
         log.warning("Huellas: solo %d tramos con datos", len(tramos))
     comp = comparar(snaps, X)
     lect = lectura(comp)
+    # La calma se mide contra todos los tramos (también los anteriores a los indicadores).
+    tramos["desde_calma"] = desde_la_calma(eps, cal).reindex(tramos.index).fillna(False).astype(bool)
+    calma = tramos["desde_calma"]
+    lect_calma = lectura(comparar({m: s_.loc[calma] for m, s_ in snaps.items()}, X)) if calma.sum() else pd.DataFrame()
     Xp = pilares_igual
     tray_pico = trayectoria(tramos, Xp, "pico")
     tray_valle = trayectoria(tramos, Xp, "valle")
@@ -396,8 +417,9 @@ def analizar(eps: pd.DataFrame, riesgo: pd.DataFrame, pilares_igual: pd.DataFram
             analogos["total"] = pilares_igual.get("total", pd.Series(dtype=float)).reindex(analogos.index)
         parecidas = caidas_parecidas(F, hoy, tramos)
         vecinos = {"prob": float(prob.get(hoy, np.nan)), "k": K_VECINOS}
-    log.info("Huellas: %d tramos con datos; análogos hoy %.0f %% (base %.0f %%)", len(tramos),
-             100 * vecinos.get("prob", np.nan), 100 * base)
+    log.info("Huellas: %d tramos con datos (%d desde la calma); análogos hoy %.0f %% (base %.0f %%)", len(tramos),
+             int(calma.sum()), 100 * vecinos.get("prob", np.nan), 100 * base)
     return Huellas(tramos=tramos, instantaneas=snaps, comparacion=comp, lectura=lect, trayectoria_pico=tray_pico,
                    trayectoria_valle=tray_valle, por_tipo=tipo, rasgos=F, prob=prob, base_y3=base, evaluacion=ev,
-                   calibracion=cal_t, analogos_hoy=analogos, caidas_parecidas=parecidas, fecha=hoy, vecinos_hoy=vecinos)
+                   calibracion=cal_t, analogos_hoy=analogos, caidas_parecidas=parecidas, fecha=hoy, vecinos_hoy=vecinos,
+                   lectura_calma=lect_calma)

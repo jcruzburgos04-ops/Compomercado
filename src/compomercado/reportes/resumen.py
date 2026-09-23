@@ -126,6 +126,19 @@ def texto(res: Resultados) -> str:
             nombre = "Total" if c == "total" else PILARES.get(c, c)
             L.append(f"    {nombre:<28} {f['media_pre21']:3.0f} {f['media_pre5']:4.0f} {f['media_pico']:4.0f} "
                      f"{f['media_conf']:4.0f} {f['media_valle']:4.0f} · {f['media_base']:3.0f}  {f['papel']}")
+        lc = hu.lectura_calma
+        if not lc.empty:
+            n_calma = int(hu.tramos["desde_calma"].sum())
+            L.append(f"  Solo caídas desde la calma ({n_calma} tramos, 63+ ruedas después del valle anterior):")
+            for i, f in lc[lc.index.str.startswith(PREFIJO_PILAR)].iterrows():
+                c = i[len(PREFIJO_PILAR):]
+                nombre = "Total" if c == "total" else PILARES.get(c, c)
+                L.append(f"    {nombre:<28} {f['media_pre21']:3.0f} {f['media_pre5']:4.0f} {f['media_pico']:4.0f} "
+                         f"{f['media_conf']:4.0f} {f['media_valle']:4.0f} · {f['media_base']:3.0f}  {f['papel']}")
+            ant = lc[~lc.index.str.startswith(PREFIJO_PILAR) & lc["papel"].str.startswith(("Anticipa", "Calma"))]
+            L.append("    Indicadores con señal antes del pico: " + ("; ".join(
+                f"{ids.get(i, i)} ({f['media_pre5']:.0f} vs {f['media_base']:.0f}, {f['papel'].split(':')[0]})"
+                for i, f in ant.sort_values("q_pre").iterrows()) or "ninguno significativo"))
         v = hu.vecinos_hoy
         L.append(f"  Análogos hoy: {_pct0(v.get('prob'))} de los {v.get('k')} días más parecidos antecedieron una "
                  f"caída ≥5 % en 21 ruedas (día cualquiera: {_pct0(hu.base_y3)})")

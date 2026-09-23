@@ -579,7 +579,10 @@ def seccion_huellas(res: Resultados) -> str:
     pil_cols = [c for c in res.pilares_igual.columns if c != "total"] + ["total"]
     nombre_pil = {c: ("Total" if c == "total" else PILARES.get(c, c)) for c in pil_cols}
     ids = {i.id: i for i in res.indicadores}
-    etiqueta = [f"{e['pico']:%Y-%m-%d} {e['profundidad']:.0%} {e.get('tipo', '') or ''}".strip() for _, e in tr.iterrows()]
+    etiqueta = [f"{e['pico']:%Y-%m-%d} {e['profundidad']:.0%} {e.get('tipo', '') or ''}".strip()
+                + (" ◆" if e.get("desde_calma") else "") for _, e in tr.iterrows()]
+    n_calma = int(tr["desde_calma"].sum()) if "desde_calma" in tr else 0
+    lc = h.lectura_calma
 
     # --- hoy ---------------------------------------------------------------------------------
     prob = h.vecinos_hoy.get("prob", np.nan)
@@ -675,6 +678,9 @@ def seccion_huellas(res: Resultados) -> str:
     orden = {"Anticipa: alto antes del pico": 0, "Calma previa: bajo antes del pico": 1, "Confirma: sube con la caída": 2,
              "Marca el piso: máximo en el valle": 3, "Sin patrón claro": 4}
     ind["_o"] = ind["papel"].map(orden)
+    if not lc.empty:
+        ind["calma_pre5"] = lc["media_pre5"].reindex(ind.index)
+        ind["calma_papel"] = lc["papel"].reindex(ind.index)
     ind = ind.sort_values(["_o", "lift_pre5"], ascending=[True, False])
     cols_ind = [("nombre", "Indicador", "texto"), ("pilar", "Pilar", "texto"), ("papel", "Papel en las caídas", "texto")]
     cols_ind += [(f"media_{m}", NOMBRES_MOMENTO[m], "puntaje", "Percentil de riesgo medio en ese momento")
@@ -685,13 +691,25 @@ def seccion_huellas(res: Resultados) -> str:
                  ("lift_pre5", "Cuántas veces más", "x"),
                  ("q_pre", "q antes del pico", "num", "Significancia corregida por comparaciones múltiples; < 0,10 = significativo"),
                  ("n", "Tramos", "int")]
+    if not lc.empty:
+        cols_ind += [("calma_pre5", "1 sem antes · desde la calma", "puntaje",
+                      "Solo caídas que arrancaron 63+ ruedas después del valle anterior"),
+                     ("calma_papel", "Papel · desde la calma", "texto")]
     t_ind = tabla(ind, cols_ind)
 
     pl = lec[lec.index.str.startswith(PREFIJO_PILAR)].copy()
+    cols_pl = ([("__indice__", "Pilar", "texto"), ("papel", "Papel", "texto")]
+               + [(f"media_{m}", NOMBRES_MOMENTO[m], "puntaje") for m in MOMENTOS]
+               + [("media_base", "Día cualquiera", "puntaje"), ("q_pre", "q antes del pico", "num")])
+    if not lc.empty:
+        pl["calma_pre21"] = lc["media_pre21"].reindex(pl.index)
+        pl["calma_pre5"] = lc["media_pre5"].reindex(pl.index)
+        pl["calma_papel"] = lc["papel"].reindex(pl.index)
+        cols_pl += [("calma_pre21", "1 mes antes · desde la calma", "puntaje"),
+                    ("calma_pre5", "1 sem antes · desde la calma", "puntaje"),
+                    ("calma_papel", "Papel · desde la calma", "texto")]
     pl.index = [nombre_pil.get(i[len(PREFIJO_PILAR):], i) for i in pl.index]
-    t_pil = tabla(pl, [("__indice__", "Pilar", "texto"), ("papel", "Papel", "texto")]
-                  + [(f"media_{m}", NOMBRES_MOMENTO[m], "puntaje") for m in MOMENTOS]
-                  + [("media_base", "Día cualquiera", "puntaje"), ("q_pre", "q antes del pico", "num")])
+    t_pil = tabla(pl, cols_pl)
 
     # --- por tipo --------------------------------------------------------------------------------
     t_tipo = ""
@@ -745,7 +763,12 @@ estuvo significativamente más bajo (complacencia). <strong>Confirma</strong>: s
 comparar muchos indicadores a la vez. Los tramos se superponen en las crisis largas (2008, 2022), así que la
 significancia es optimista: tomala como orden de importancia, no como certeza.</p>
 {t_ind}
-<h3>Pilares</h3>{t_pil}
+<h3>Pilares</h3>
+<p class="pie">Las caídas vienen en rachas: dentro de 2008 o de 2022 cada pierna nueva arranca con el estrés que dejó la
+anterior. Por eso se separan las <strong>caídas desde la calma</strong> ({n_calma} de {len(tr)}, marcadas con ◆): las que
+empezaron 63 ruedas o más después del valle anterior. Si un indicador anticipa también ahí, avisa algo nuevo; si solo
+anticipa en el total, lo que muestra es que el mercado seguía agitado.</p>
+{t_pil}
 <h3>Huella por tipo de caída</h3>
 <p class="pie">Puntaje medio de cada pilar según el tipo de caída (reglas de la pestaña Caídas). Pocos tramos por tipo:
 es orientativo.</p>

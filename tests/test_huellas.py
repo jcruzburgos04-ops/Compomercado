@@ -85,3 +85,10 @@ def test_analogos_de_hoy_son_de_episodios_distintos():
     assert all(b - x >= 63 for x, b in zip(pos, pos[1:], strict=False))
     assert max(pos) < len(F) - 126
     assert a["distancia"].is_monotonic_increasing
+
+
+def test_desde_la_calma_separa_rachas():
+    fechas = pd.bdate_range("2000-01-03", periods=1000)
+    eps = _tramos(fechas, [100, 130, 300, 330, 600])   # dos rachas y un tramo aislado
+    calma = hu.desde_la_calma(eps, fechas, ruedas=63)
+    assert list(calma) == [True, False, True, False, True]
