@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+# Datos descargados y salidas generadas (se regeneran en GitHub Actions)
+datos/
+sitio/
+# El registro forward vive en su propia rama (registro)
+registro/

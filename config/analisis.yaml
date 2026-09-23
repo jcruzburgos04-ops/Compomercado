@@ -1,0 +1,29 @@
+# Parámetros del análisis (Fase 1 y panel de estado preliminar).
+
+# Referencias contra las que se construye el mapa de comportamiento.
+referencias_mapa: [SPY, QQQ, IWM, EFA, EEM]
+
+# Grupos de config/universos.yaml que entran al mapa de comportamiento.
+grupos_mapa: [referencias, sectores, industrias, factores, global_etf, global_indices,
+              renta_fija, divisas, commodities, cripto]
+
+# Grupos que no cotizan en el horario de EE. UU.: sus métricas se calculan con
+# retornos semanales para evitar el sesgo por asincronía.
+grupos_asincronicos: [global_indices, divisas, cripto]
+
+# Episodios de caída.
+caidas:
+  zigzag: [0.05, 0.10, 0.20]       # caída desde el pico y rebote del mismo tamaño
+  bajo_agua: [0.10, 0.20]          # pico -> valle -> recuperación del pico
+  umbral_mapa: 0.10                # episodios usados en la tabla por episodio
+  ventana_pre_pico: 63
+  ventana_rebote: [21, 63]
+
+# Reglas (tentativas) para clasificar el tipo de caída según su huella macro.
+# Se evalúan en orden; la primera que se cumple define el tipo.
+tipos_caida:
+  - {tipo: "Crédito / recesión", condicion: "d_baa10y >= 0.50"}
+  - {tipo: "Pánico de liquidez", condicion: "dias_caida <= 25 and vix_max >= 35"}
+  - {tipo: "Tasas / inflación", condicion: "d_dgs10 >= 0.30"}
+  - {tipo: "Crecimiento", condicion: "d_dgs10 <= -0.30"}
+  - {tipo: "Otro", condicion: "True"}

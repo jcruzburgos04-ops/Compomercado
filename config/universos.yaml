@@ -151,27 +151,47 @@ cripto:
   - {ticker: BTC-USD, nombre: "Bitcoin"}
   - {ticker: ETH-USD, nombre: "Ethereum"}
 
-# Series macro y de estrés (FRED). Detalle y uso en docs/catalogo_variables.md.
+# Series macro y de estrés (FRED). lag_dias = días corridos entre la fecha del dato y su
+# publicación (conservador). Se aplica siempre antes de usar la serie como indicador.
 fred:
-  - BAA10Y          # spread Baa - Tesoro 10a
-  - BAMLH0A0HYM2    # OAS high yield (historial recortado en FRED: verificar)
-  - BAMLC0A0CM      # OAS grado de inversión (idem)
-  - T10Y2Y
-  - T10Y3M
-  - DGS10
-  - DFII10
-  - T10YIE
-  - STLFSI4         # St. Louis Fed Financial Stress Index (semanal)
-  - NFCI            # Chicago Fed (semanal)
-  - ANFCI
-  - WALCL           # balance de la Fed
-  - WTREGEN         # cuenta del Tesoro (TGA)
-  - RRPONTSYD       # repos reversos
-  - ICSA            # pedidos iniciales de desempleo
-  - SAHMREALTIME
-  - DCOILWTICO
-  - DEXJPUS
-  - USREC           # recesiones NBER (solo etiqueta, no predictor)
+  BAA10Y: {lag_dias: 1, nombre: "Spread Baa - Tesoro 10a"}
+  BAMLH0A0HYM2: {lag_dias: 1, nombre: "OAS high yield (historial recortado en FRED)"}
+  BAMLC0A0CM: {lag_dias: 1, nombre: "OAS grado de inversión (historial recortado en FRED)"}
+  T10Y2Y: {lag_dias: 1, nombre: "Curva 10a - 2a"}
+  T10Y3M: {lag_dias: 1, nombre: "Curva 10a - 3m"}
+  DGS10: {lag_dias: 1, nombre: "Tasa del Tesoro 10a"}
+  DGS2: {lag_dias: 1, nombre: "Tasa del Tesoro 2a"}
+  DFII10: {lag_dias: 1, nombre: "Tasa real 10a (TIPS)"}
+  T10YIE: {lag_dias: 1, nombre: "Breakeven de inflación 10a"}
+  STLFSI4: {lag_dias: 7, nombre: "Índice de estrés financiero St. Louis Fed (semanal)"}
+  NFCI: {lag_dias: 6, nombre: "Condiciones financieras Chicago Fed (semanal)"}
+  ANFCI: {lag_dias: 6, nombre: "Condiciones financieras ajustadas Chicago Fed (semanal)"}
+  WALCL: {lag_dias: 2, nombre: "Balance de la Fed"}
+  WTREGEN: {lag_dias: 2, nombre: "Cuenta del Tesoro (TGA)"}
+  RRPONTSYD: {lag_dias: 1, nombre: "Repos reversos"}
+  ICSA: {lag_dias: 6, nombre: "Pedidos iniciales de desempleo"}
+  SAHMREALTIME: {lag_dias: 40, nombre: "Regla de Sahm (tiempo real)"}
+  DCOILWTICO: {lag_dias: 7, nombre: "Petróleo WTI spot"}
+  DEXJPUS: {lag_dias: 7, nombre: "Yenes por dólar"}
+  USREC: {lag_dias: 365, nombre: "Recesiones NBER (solo etiqueta)"}
+
+# Series CBOE (fuente primaria de la familia VIX; Yahoo queda como respaldo).
+cboe: [VIX, VIX9D, VIX3M, VIX6M, VVIX, SKEW, VXN, RVX, OVX, GVZ]
+
+# Módulo Argentina. CCL implícito = precio local * acciones por ADR / precio del ADR.
+argentina:
+  merval: ^MERV
+  ccl_pares:
+    - {adr: GGAL, local: GGAL.BA, ratio: 10}
+    - {adr: YPF, local: YPFD.BA, ratio: 1}
+    - {adr: PAM, local: PAMP.BA, ratio: 25}
+    - {adr: BMA, local: BMA.BA, ratio: 10}
+    - {adr: BBAR, local: BBAR.BA, ratio: 3}
+    - {adr: CEPU, local: CEPU.BA, ratio: 10}
+    - {adr: TGS, local: TGSU2.BA, ratio: 5}
+    - {adr: SUPV, local: SUPV.BA, ratio: 5}
+    - {adr: TEO, local: TECO2.BA, ratio: 5}
+    - {adr: EDN, local: EDN.BA, ratio: 20}
 
 # Historia larga sin sesgo de supervivencia.
 ken_french:
