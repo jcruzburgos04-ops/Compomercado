@@ -151,6 +151,8 @@ fred:
   T10Y3M: {lag_dias: 1, nombre: "Curva 10a - 3m"}
   DGS10: {lag_dias: 1, nombre: "Tasa del Tesoro 10a"}
   DGS2: {lag_dias: 1, nombre: "Tasa del Tesoro 2a"}
+  DTB3: {lag_dias: 1, nombre: "Letras del Tesoro 3 meses"}
+  DCPF3M: {lag_dias: 1, nombre: "Papel comercial financiero AA 3 meses"}
   DFII10: {lag_dias: 1, nombre: "Tasa real 10a (TIPS)"}
   T10YIE: {lag_dias: 1, nombre: "Breakeven de inflación 10a"}
   STLFSI4: {lag_dias: 7, nombre: "Índice de estrés financiero St. Louis Fed (semanal)"}

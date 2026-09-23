@@ -148,6 +148,48 @@ def exposicion_vol_control(p: pd.Series, objetivo: float = 0.10, tope: float = 1
     return (objetivo / vol).clip(upper=tope)
 
 
+def mcclellan(precios: pd.DataFrame, minimo: int = 10) -> pd.Series:
+    """Oscilador McClellan sobre un universo: EMA 19 − EMA 39 de (suben − bajan) / (suben + bajan)."""
+    r = precios.pct_change(fill_method=None)
+    suben, bajan = (r > 0).sum(axis=1), (r < 0).sum(axis=1)
+    n = suben + bajan
+    neto = ((suben - bajan) / n).where(n >= minimo)
+    return neto.ewm(span=19, min_periods=19).mean() - neto.ewm(span=39, min_periods=39).mean()
+
+
+def maximos_minimos(precios: pd.DataFrame, h: int = 252, suavizado: int = 10, minimo: int = 10) -> pd.Series:
+    """% del universo en máximo de h ruedas menos % en mínimo, promedio de `suavizado` ruedas."""
+    alto = precios.rolling(h, min_periods=h).max()
+    bajo = precios.rolling(h, min_periods=h).min()
+    validos = alto.notna() & precios.notna()
+    n = validos.sum(axis=1)
+    neto = ((precios >= alto) & validos).sum(axis=1) - ((precios <= bajo) & validos).sum(axis=1)
+    return (neto / n).where(n >= minimo).rolling(suavizado, min_periods=1).mean()
+
+
+def divergencia_amplitud(p: pd.Series, participacion: pd.Series, h: int = 21, cerca: float = 0.02,
+                         umbral: float = 0.5) -> pd.Series:
+    """Ruedas de las últimas `h` con el índice a menos de `cerca` de su máximo de 252 ruedas y menos de
+    `umbral` del universo sobre su media de 50: el índice sube con pocos."""
+    en_maximo = p >= p.rolling(252, min_periods=252).max() * (1 - cerca)
+    debil = participacion < umbral
+    return (en_maximo & debil).astype(float).where(participacion.notna()).rolling(h, min_periods=h).sum()
+
+
+def choque(p: pd.Series, h: int = 21, ventana: int = 252) -> pd.Series:
+    """Tamaño del movimiento de h ruedas medido en desvíos de su propia historia (valor absoluto)."""
+    ret = np.log(p).diff(h)
+    sd = np.log(p).diff().rolling(ventana, min_periods=ventana // 2).std() * np.sqrt(h)
+    return (ret / sd).abs()
+
+
+def ubicacion_cierre(cierre: pd.Series, maximo: pd.Series, minimo: pd.Series, h: int = 21) -> pd.Series:
+    """Ubicación del cierre en el rango del día (CLV, −1 = en el mínimo, +1 = en el máximo), media h ruedas."""
+    rango = (maximo - minimo).where(maximo > minimo)
+    clv = ((cierre - minimo) - (maximo - cierre)) / rango
+    return clv.rolling(h, min_periods=h // 2).mean()
+
+
 # --- construcción de indicadores ------------------------------------------------------------
 
 def calcular(S: Series) -> list[Indicador]:
@@ -182,11 +224,35 @@ def calcular(S: Series) -> list[Indicador]:
     agregar("vrp", "Prima de vol. (VIX − realizada)", "volatilidad", -1, lambda: vix() - rv21 * 100,
             desc="Negativa = la volatilidad real supera a la implícita (estrés en curso)")
     agregar("move", "MOVE (vol. de bonos)", "volatilidad", +1, lambda: col("^MOVE"))
+    agregar("vix3m_vix6m", "VIX3M / VIX6M", "volatilidad", +1,
+            lambda: S.vol("VIX3M").reindex(cal) / S.vol("VIX6M").reindex(cal), "x",
+            "> 1 = el estrés se extiende a varios meses")
+    agregar("skew", "CBOE SKEW", "volatilidad", +1, lambda: S.vol("SKEW").reindex(cal),
+            desc="Precio relativo de la protección contra caídas extremas")
+    agregar("vxn_vix", "VXN − VIX (tecnología)", "volatilidad", +1, lambda: S.vol("VXN").reindex(cal) - vix(),
+            desc="Estrés concentrado en el Nasdaq 100")
+    agregar("rvx_vix", "RVX − VIX (small caps)", "volatilidad", +1, lambda: S.vol("RVX").reindex(cal) - vix(),
+            desc="Estrés concentrado en el Russell 2000")
+    agregar("ovx", "OVX (vol. del petróleo)", "volatilidad", +1, lambda: S.vol("OVX").reindex(cal))
+    agregar("gvz", "GVZ (vol. del oro)", "volatilidad", +1, lambda: S.vol("GVZ").reindex(cal))
 
     # Tendencia
     agregar("spy_vs_200", "SPY vs media de 200", "tendencia", -1, lambda: spy / spy.rolling(200).mean() - 1, "pct")
     agregar("drawdown", "Drawdown de SPY", "tendencia", -1, lambda: spy / spy.cummax() - 1, "pct")
     agregar("mom_63", "Momentum SPY 63d", "tendencia", -1, lambda: spy / spy.shift(63) - 1, "pct")
+    agregar("spy_vs_50", "SPY vs media de 50", "tendencia", -1, lambda: spy / spy.rolling(50).mean() - 1, "pct")
+    agregar("pendiente_200", "Pendiente de la media de 200 (21d)", "tendencia", -1,
+            lambda: spy.rolling(200).mean().pct_change(21), "pct")
+    agregar("mom_252", "Momentum SPY 12 meses", "tendencia", -1, lambda: spy / spy.shift(252) - 1, "pct")
+    agregar("ret_ajustado", "Retorno 63d / volatilidad", "tendencia", -1,
+            lambda: np.log(spy).diff(63) / (np.log(spy).diff().rolling(63).std() * np.sqrt(63)),
+            desc="Calidad de la tendencia: suba con poca volatilidad = alto")
+    ohlc = {k: S.alm.precios(k, ["SPY"]).reindex(cal).get("SPY") for k in ("apertura", "cierre", "maximo", "minimo")}
+    if all(v is not None for v in ohlc.values()):
+        ap, ci, mx, mn = ohlc["apertura"], ohlc["cierre"], ohlc["maximo"], ohlc["minimo"]
+        agregar("overnight_intradia", "Intradía − overnight SPY (21d)", "tendencia", -1,
+                lambda: (np.log(ci / ap).rolling(21).sum() - np.log(ap / ci.shift(1)).rolling(21).sum()), "pct",
+                "Negativo = sube de noche y se vende en la sesión (posible distribución)")
 
     # Amplitud (universo propio de ETFs, sin sesgo de supervivencia)
     ind_sect = [t for t in SECTORES_BASE + [i.ticker for i in S.p.grupo("industrias")] if t in c.columns]
@@ -195,7 +261,18 @@ def calcular(S: Series) -> list[Indicador]:
             lambda: pct_sobre_media(c[ind_sect], 200), "pct")
     agregar("pct_50", "% sectores/industrias > media 50", "amplitud", -1,
             lambda: pct_sobre_media(c[ind_sect], 50), "pct")
+    agregar("pct_20", "% sectores/industrias > media 20", "amplitud", -1,
+            lambda: pct_sobre_media(c[ind_sect], 20), "pct")
+    agregar("mcclellan", "McClellan (sectores/industrias)", "amplitud", -1, lambda: mcclellan(c[ind_sect]),
+            desc="Momentum de la amplitud: EMA 19 − EMA 39 de suben menos bajan")
+    agregar("max_min", "Máximos − mínimos de 52 semanas", "amplitud", -1, lambda: maximos_minimos(c[ind_sect]), "pct",
+            "% del universo en máximos menos % en mínimos (media 10 ruedas)")
+    agregar("divergencia", "Divergencia de amplitud (21 ruedas)", "amplitud", +1,
+            lambda: divergencia_amplitud(spy, pct_sobre_media(c[ind_sect], 50)),
+            desc="Ruedas con SPY a menos de 2 % del máximo y menos de la mitad del universo sobre su media de 50")
     agregar("rsp_spy", "Igual peso vs cap. (RSP/SPY 63d)", "amplitud", -1, lambda: rel(col("RSP"), spy, 63), "pct")
+    agregar("mdy_spy", "Mid caps vs SPY (63d)", "amplitud", -1, lambda: rel(col("MDY"), spy, 63), "pct")
+    agregar("xli_xlu", "Industriales vs utilities (63d)", "amplitud", -1, lambda: rel(col("XLI"), col("XLU"), 63), "pct")
     agregar("iwm_spy", "Small caps vs SPY (63d)", "amplitud", -1, lambda: rel(col("IWM"), spy, 63), "pct")
     agregar("xly_xlp", "Discrecional vs básico (63d)", "amplitud", -1, lambda: rel(col("XLY"), col("XLP"), 63), "pct")
     agregar("sphb_splv", "Alta beta vs baja vol. (63d)", "amplitud", -1, lambda: rel(col("SPHB"), col("SPLV"), 63), "pct")
@@ -210,6 +287,13 @@ def calcular(S: Series) -> list[Indicador]:
     agregar("stlfsi", "Estrés financiero St. Louis Fed", "credito", +1, lambda: S.fred("STLFSI4"))
     agregar("nfci", "Condiciones financieras (NFCI)", "credito", +1, lambda: S.fred("NFCI"))
     agregar("kre_spy", "Bancos regionales vs SPY (21d)", "credito", -1, lambda: rel(col("KRE"), spy, 21), "pct")
+    agregar("lqd_ief", "Grado de inversión vs Tesoro (LQD/IEF 21d)", "credito", -1, lambda: rel(col("LQD"), col("IEF"), 21), "pct")
+    agregar("emb_ief", "Deuda emergente vs Tesoro (EMB/IEF 21d)", "credito", -1, lambda: rel(col("EMB"), col("IEF"), 21), "pct")
+    agregar("cp_spread", "Papel comercial − letras 3 meses", "credito", +1, lambda: S.fred("DCPF3M") - S.fred("DTB3"),
+            desc="Costo de financiamiento de corto plazo de los bancos")
+    agregar("liquidez_neta", "Liquidez neta de la Fed (63d)", "credito", -1,
+            lambda: (S.fred("WALCL") / 1000 - S.fred("WTREGEN") - S.fred("RRPONTSYD").fillna(0)).pct_change(63), "pct",
+            "Balance de la Fed − cuenta del Tesoro − repos reversos; variación en 63 ruedas")
 
     # Cross-asset y macro
     agregar("usdjpy_21", "USDJPY 21d (yen)", "cross_asset", -1, lambda: col("JPY=X") / col("JPY=X").shift(21) - 1,
@@ -220,6 +304,19 @@ def calcular(S: Series) -> list[Indicador]:
     agregar("dgs10_d63", "Δ tasa 10a en 63d", "cross_asset", 0, lambda: S.fred("DGS10").diff(63),
             desc="Contexto: shock de tasas (+) o de crecimiento (−)")
     agregar("curva", "Curva 10a − 2a", "cross_asset", 0, lambda: S.fred("T10Y2Y"))
+    agregar("curva_3m", "Curva 10a − 3m", "cross_asset", 0, lambda: S.fred("T10Y3M"))
+    agregar("tasas_shock", "Shock de tasas 10a (21d, en σ)", "cross_asset", +1,
+            lambda: S.fred("DGS10").diff(21) / (S.fred("DGS10").diff().rolling(252, min_periods=126).std() * np.sqrt(21)),
+            desc="Suba de la tasa larga medida en desvíos de su historia")
+    agregar("petroleo_shock", "Shock del petróleo (21d, en σ)", "cross_asset", +1, lambda: choque(col("CL=F")),
+            desc="Movimiento grande del WTI en cualquier sentido")
+    agregar("btc_21", "Bitcoin 21d", "cross_asset", -1, lambda: col("BTC-USD") / col("BTC-USD").shift(21) - 1, "pct",
+            "Apetito de riesgo que cotiza todos los días")
+    agregar("desempleo", "Pedidos de desempleo vs mínimo 52 sem.", "cross_asset", +1,
+            lambda: S.fred("ICSA").rolling(20, min_periods=15).mean() / S.fred("ICSA").rolling(252, min_periods=200).min() - 1,
+            "pct", "Promedio de 4 semanas contra su mínimo del último año")
+    agregar("sahm", "Regla de Sahm", "cross_asset", +1, lambda: S.fred("SAHMREALTIME"),
+            desc="≥ 0,5 = el desempleo subió como al inicio de una recesión")
     agregar("corr_acc_bonos", "Correlación SPY-TLT 63d", "cross_asset", +1,
             lambda: (spy.pct_change()).rolling(63).corr(col("TLT").pct_change()),
             desc="Positiva = los bonos no cubren")
@@ -227,6 +324,17 @@ def calcular(S: Series) -> list[Indicador]:
     # Global
     agregar("pct_200_global", "% mercados globales > media 200", "global", -1, lambda: pct_sobre_media(c[glob], 200), "pct")
     agregar("eem_spy", "Emergentes vs SPY (63d)", "global", -1, lambda: rel(col("EEM"), spy, 63), "pct")
+    agregar("efa_spy", "Desarrollados ex EE. UU. vs SPY (63d)", "global", 0, lambda: rel(col("EFA"), spy, 63), "pct",
+            "Contexto: liderazgo global contra EE. UU.")
+    agregar("china_21", "China vs SPY (FXI 21d)", "global", -1, lambda: rel(col("FXI"), spy, 21), "pct")
+    agregar("usdcny_21", "USDCNY 21d (yuan)", "global", +1, lambda: col("CNY=X") / col("CNY=X").shift(21) - 1, "pct",
+            "Suba = yuan débil: estrés en China")
+    agregar("cew_21", "Monedas emergentes 21d (CEW)", "global", -1, lambda: col("CEW") / col("CEW").shift(21) - 1, "pct")
+    europa = [t for t in ("^GDAXI", "^STOXX50E", "^FTSE", "^FCHI") if t in S.cierres.columns]
+    if europa:
+        agregar("europa_5d", "Europa 5 ruedas", "global", -1,
+                lambda: pd.concat([S.precio(t).pct_change(5).reindex(cal, method="ffill") for t in europa], axis=1).mean(axis=1),
+                "pct", "Promedio de DAX, Euro Stoxx 50, FTSE 100 y CAC 40")
     asia = [t for t in ("^N225", "^HSI", "^KS11", "^TWII") if t in S.cierres.columns]
     agregar("asia_5d", "Asia 5 ruedas", "global", -1,
             lambda: pd.concat([S.precio(t).pct_change(5).reindex(cal, method="ffill") for t in asia], axis=1).mean(axis=1),
@@ -244,6 +352,9 @@ def calcular(S: Series) -> list[Indicador]:
     if "SPY" in vol_spy.columns:
         agregar("distribucion", "Días de distribución (25 ruedas)", "flujos", +1,
                 lambda: dias_distribucion(spy, vol_spy["SPY"]))
+    if all(v is not None for v in ohlc.values()):
+        agregar("clv", "Ubicación del cierre SPY (21d)", "flujos", -1, lambda: ubicacion_cierre(ci, mx, mn),
+                desc="−1 = cierra en el mínimo del día (venta en la sesión), +1 = en el máximo")
     posicion, gatillo = cta_estimado(spy)
     agregar("cta", "Posición estimada de CTAs", "flujos", -1, lambda: posicion,
             desc="-1 = todos los plazos vendidos, +1 = todos comprados")

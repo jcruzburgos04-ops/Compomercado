@@ -45,7 +45,8 @@ def test_indicadores_sin_look_ahead(tmp_path):
     corte = pd.Timestamp("2021-06-15")
     q = sintetico.crear(tmp_path / "truncado")
     alm = Almacen(q.dir_datos)
-    for nombre in ["precios/cierre_aj", "precios/cierre", "precios/volumen", "cboe"]:
+    for nombre in ["precios/cierre_aj", "precios/cierre", "precios/apertura", "precios/maximo", "precios/minimo",
+                   "precios/volumen", "cboe"]:
         alm.guardar(nombre, alm.leer(nombre).loc[:corte])
     # FRED: el dato con fecha d se publica en d + lag, así que a la fecha de corte solo se conocía hasta corte - lag.
     fred = alm.leer("fred")
