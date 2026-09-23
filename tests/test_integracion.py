@@ -25,6 +25,8 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
     for seccion in ("Estado del mercado", "Mapa de comportamiento", "Historia desde 1926", "Argentina", "Registro forward"):
         assert seccion in html
     assert "Esta sección falló" not in html
+    # Los datos del test son sintéticos: el tablero tiene que avisarlo.
+    assert "DATOS DE PRUEBA" in html and "Datos reales descargados" not in html
     assert (p.dir_sitio / "datos" / "mapa_SPY.csv").exists()
 
     # El registro forward no duplica la fila del día.
@@ -69,3 +71,15 @@ def test_parte_diario_en_texto(tmp_path):
     res = analizar(p, registrar=False, snapshot_opciones=False)
     t = texto(res)
     assert "RIESGO TOTAL" in t and "MAPA VS SPY" in t and "HISTORIA DESDE 1926" in t and "ARGENTINA" in t
+
+
+def test_sello_de_origen_real(tmp_path):
+    from compomercado.datos.almacen import Almacen
+
+    alm = Almacen(tmp_path)
+    assert not alm.origen()["real"]
+    for fuente in ("yahoo", "fred", "cboe", "ken_french"):
+        alm.registrar_descarga(fuente, origen="descarga", fallidos=[])
+    assert alm.origen()["real"]
+    alm.registrar_descarga("fred", origen="sintetico", fallidos=[])
+    assert not alm.origen()["real"]

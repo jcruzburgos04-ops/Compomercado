@@ -41,6 +41,11 @@ def analizar(
     from .reportes.resumen import texto
 
     p = _proyecto(raiz)
+    from .datos.almacen import Almacen
+
+    if os.environ.get("GITHUB_ACTIONS") == "true" and not Almacen(p.dir_datos).origen()["real"]:
+        typer.echo("Los datos no provienen de una descarga real: no se analiza ni se publica.", err=True)
+        raise typer.Exit(code=1)
     res = correr(p, registrar=registrar, snapshot_opciones=opciones)
     ruta = construir(res, p.dir_sitio)
     parte = texto(res)

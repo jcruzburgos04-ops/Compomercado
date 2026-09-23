@@ -14,7 +14,13 @@ def _pct(v: float) -> str:
 
 
 def texto(res: Resultados) -> str:
-    L: list[str] = [f"COMPOMERCADO · datos al cierre del {res.fecha:%Y-%m-%d}", ""]
+    L: list[str] = [f"COMPOMERCADO · datos al cierre del {res.fecha:%Y-%m-%d}"]
+    o = res.origen or {}
+    if o.get("real"):
+        L.append(f"Origen: descarga real de {', '.join(o['fuentes'])} ({str(o.get('descargado_utc'))[:16]} UTC)")
+    else:
+        L.append("ATENCIÓN: DATOS DE PRUEBA, no reflejan el mercado")
+    L.append("")
     pil = res.pilares
     if "total" in pil and pil["total"].notna().any():
         t = pil["total"].dropna()

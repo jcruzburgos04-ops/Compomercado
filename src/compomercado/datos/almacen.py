@@ -72,3 +72,16 @@ class Almacen:
         meta[fuente] = {"actualizado_utc": datetime.now(UTC).isoformat(timespec="seconds"), **info}
         self._ruta_meta().parent.mkdir(parents=True, exist_ok=True)
         self._ruta_meta().write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def origen(self) -> dict:
+        """Resume de dónde salieron los datos: descarga real de las fuentes o datos de prueba.
+
+        Devuelve {"real": bool, "fuentes": [...], "descargado_utc": fecha más vieja de descarga}.
+        Solo cuenta como real si todas las fuentes se registraron con origen "descarga".
+        """
+        meta = self.metadatos()
+        if not meta:
+            return {"real": False, "fuentes": [], "descargado_utc": None}
+        real = all(m.get("origen") == "descarga" for m in meta.values())
+        fechas = sorted(m.get("actualizado_utc", "") for m in meta.values() if m.get("actualizado_utc"))
+        return {"real": real, "fuentes": sorted(meta), "descargado_utc": fechas[0] if fechas else None}

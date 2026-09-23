@@ -655,6 +655,8 @@ p { max-width: 900px; }
 .tile-sub { color: var(--tinta-2); font-size: 12px; margin-top: 6px; }
 .estado { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; margin-top: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--borde); }
 .estado::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.origen { font-size: 13px; color: var(--tinta-2); margin: 4px 0 0; }
+.aviso-prueba { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; border: 2px solid var(--critical); color: var(--tinta); font-weight: 600; }
 .estado.good { --c: var(--good); } .estado.warning { --c: var(--warning); } .estado.serious { --c: var(--serious); } .estado.critical { --c: var(--critical); }
 .nota { flex: 1; min-width: 260px; background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 4px 16px; font-size: 14px; }
 .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
@@ -678,6 +680,7 @@ a { color: var(--acento); }
 <header>
   <h1>Compomercado</h1>
   <p class="sub">Sensor de comportamiento de mercado y sectores · datos al cierre del __FECHA__ · generado __GENERADO__ UTC</p>
+  __ORIGEN__
 </header>
 <nav><div class="inner">__NAV__</div></nav>
 <main>__SECCIONES__</main>
@@ -797,7 +800,15 @@ def construir(res: Resultados, destino: Path) -> Path:
             cuerpo = f'<p class="destacado">Esta sección falló al construirse: {html.escape(str(e))}</p>'
         nav.append(f'<button class="{activo.strip()}" data-sec="{id_}">{titulo}</button>')
         secciones.append(f'<section id="{id_}" class="{activo.strip()}"><h2>{titulo}</h2>{cuerpo}</section>')
+    o = res.origen or {}
+    if o.get("real"):
+        origen = (f'<p class="origen">✓ Datos reales descargados de Yahoo Finance, FRED, CBOE y Kenneth French '
+                  f'({html.escape(str(o.get("descargado_utc") or "")[:16].replace("T", " "))} UTC).</p>')
+    else:
+        origen = ('<p class="aviso-prueba">✖ DATOS DE PRUEBA: este tablero no se armó con una descarga real de '
+                  'las fuentes y no refleja el mercado.</p>')
     pagina = (PLANTILLA.replace("__PLOTLY__", PLOTLY_JS)
+              .replace("__ORIGEN__", origen)
               .replace("__FECHA__", f"{res.fecha:%d/%m/%Y}")
               .replace("__GENERADO__", datetime.now(UTC).strftime("%Y-%m-%d %H:%M"))
               .replace("__NAV__", "".join(nav))

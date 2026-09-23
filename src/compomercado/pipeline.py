@@ -68,6 +68,7 @@ class Resultados:
     canastas: list[str]
     calidad: pd.DataFrame
     metadatos: dict
+    origen: dict
     registro_estado: pd.DataFrame
     registro_opciones: pd.DataFrame
     nombres: dict[str, str]
@@ -199,6 +200,7 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         canastas=nombres_canastas,
         calidad=calidad,
         metadatos=S.alm.metadatos(),
+        origen=S.alm.origen(),
         registro_estado=registro.leer(proyecto.dir_registro, "estado_diario.csv"),
         registro_opciones=_opciones_validas(registro.leer(proyecto.dir_registro, "opciones_diario.csv")),
         nombres=nombres,

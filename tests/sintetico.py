@@ -60,6 +60,6 @@ def crear(tmp: Path, inicio="2012-01-02", fin="2026-09-18", semilla=0) -> Proyec
     alm.guardar("french/F-F_Research_Data_Factors_daily",
                 pd.DataFrame({"Mkt-RF": rff, "SMB": 0.0, "HML": 0.0, "RF": 0.0001}, index=fechas_ff))
     for fuente in ("yahoo", "fred", "cboe", "ken_french"):
-        alm.registrar_descarga(fuente, fallidos=[])
+        alm.registrar_descarga(fuente, origen="sintetico", fallidos=[])
     reporte_precios(cierre, pd.DatetimeIndex(fechas), set()).to_csv(p.dir_datos / "calidad_precios.csv")
     return p
