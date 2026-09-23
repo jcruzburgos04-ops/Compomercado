@@ -1,0 +1,19 @@
+name: Sondeo de fuentes
+
+# Prueba manual de fuentes de datos nuevas (la red del entorno de desarrollo las bloquea).
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/awesome-wright-d8v4po]
+    paths: ["scripts/sondear_*.py", ".github/workflows/sondeo.yml"]
+
+jobs:
+  data912:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/sondear_data912.py
