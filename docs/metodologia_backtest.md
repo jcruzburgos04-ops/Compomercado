@@ -21,16 +21,22 @@ Todas las definiciones son parametrizables y se aplican a cualquier referencia: 
 
 ## 2. Objetivos a pronosticar (etiquetas)
 
-| Id | Objetivo | Horizonte | Tipo |
-|----|----------|-----------|------|
-| Y1 | Caída máxima de SPY ≥ 5 % dentro de las próximas 21 ruedas | 21d | binario |
-| Y2 | Caída máxima de SPY ≥ 10 % dentro de las próximas 63 ruedas | 63d | binario |
-| Y3 | Volatilidad realizada de las próximas 21 ruedas > percentil 80 histórico (point-in-time) | 21d | binario |
-| Y4 | VIX cierra > 30 dentro de las próximas 21 ruedas | 21d | binario |
-| Y5 | Retorno de las próximas 21 ruedas en el decil inferior | 21d | binario |
-| Y6 | Retorno relativo de cada sector vs SPY en las próximas 21 ruedas, **condicionado a que Y1 ocurra** | 21d | continuo (para rotación) |
+Horizonte **swing**: los objetivos principales son a 5, 10 y 21 ruedas.
 
-Las etiquetas se **superponen** en el tiempo: la etiqueta de hoy y la de mañana comparten 20 de 21 ruedas. Esto obliga a usar purga y embargo (§4) y a no tratar las observaciones diarias como independientes.
+| Id | Objetivo | Horizonte | Tipo | Rol |
+|----|----------|-----------|------|-----|
+| Y1 | Caída máxima de SPY ≥ 3 % dentro de las próximas 5 ruedas | 5d | binario | estrés inmediato |
+| Y2 | Caída máxima de SPY ≥ 5 % dentro de las próximas 10 ruedas | 10d | binario | principal |
+| Y3 | Caída máxima de SPY ≥ 5 % dentro de las próximas 21 ruedas | 21d | binario | **principal** |
+| Y4 | Caída máxima de SPY ≥ 10 % dentro de las próximas 63 ruedas | 63d | binario | contexto de fondo |
+| Y5 | Volatilidad realizada de las próximas 21 ruedas > percentil 80 histórico (point-in-time) | 21d | binario | riesgo |
+| Y6 | VIX cierra > 30 dentro de las próximas 21 ruedas | 21d | binario | estrés |
+| Y7 | Retorno de las próximas 21 ruedas en el decil inferior | 21d | binario | cola |
+| Y8 | Retorno relativo de cada sector vs SPY en las próximas 10/21 ruedas, **condicionado a que Y3 ocurra** | 10–21d | continuo | rotación |
+
+La "caída máxima dentro de las próximas N ruedas" se mide desde el cierre de *t*: min(cierre_{t+1..t+N}) / cierre_t − 1.
+
+Las etiquetas se **superponen** en el tiempo: con horizonte de 21 ruedas, la etiqueta de hoy y la de mañana comparten 20 ruedas. Esto obliga a usar purga y embargo (§4) y a no tratar las observaciones diarias como independientes.
 
 ---
 
@@ -66,7 +72,7 @@ Caveat honesto: el análisis descriptivo de la Fase 1 mira episodios de 2020 en 
 
 - Ventana expansiva, re-entrenamiento anual (o trimestral para modelos con pesos).
 - **Purga**: se eliminan del entrenamiento las observaciones cuya etiqueta se superpone con el tramo de prueba.
-- **Embargo**: margen de ruedas igual al horizonte de la etiqueta (21 o 63) después de cada tramo de prueba (López de Prado 2018).
+- **Embargo**: margen de ruedas igual al horizonte de la etiqueta (5, 10, 21 o 63) después de cada tramo de prueba (López de Prado 2018).
 
 ### 4.3 Pocos eventos: cómo compensar
 
@@ -123,11 +129,12 @@ El sensor tiene que demostrar que **no destruye** el rendimiento de lo que ya fu
    - Δ máximo drawdown, Δ Calmar.
    - **Captura alcista retenida** (meta ≥ 85–90 %).
    - Cantidad de "subas perdidas": días de +2 % o más estando reducido.
-2. **Sobre el historial de trades propio** (CSV del broker):
-   - Rendimiento de los trades según el estado del sensor al abrir y durante el trade.
+2. **Sobre estrategias swing de referencia**: rupturas de máximos de 20/55 ruedas, pullbacks a la media de 20 en tendencia, momentum sectorial con rebalanceo semanal. Para cada trade del backtest:
+   - Estado del sensor al abrir y durante el trade.
    - % de trades ganadores que el overlay habría recortado y P&L resignado.
    - % de trades perdedores evitados o reducidos y P&L ahorrado.
-   - **Neto** por estado. Si es negativo en un estado, el overlay no actúa en ese estado para ese operador.
+   - **Neto** por estado. Si es negativo en un estado, el overlay no actúa en ese estado.
+   - Si más adelante aparece un historial de trades propio (CSV del broker), se aplica el mismo análisis.
 3. **Reglas de diseño que se validan**:
    - Reducción gradual en vez de binaria.
    - Los líderes con fuerza relativa en máximos se excluyen del recorte.
@@ -136,7 +143,16 @@ El sensor tiene que demostrar que **no destruye** el rendimiento de lo que ya fu
 
 ---
 
-## 8. Criterios para promover algo a "producción"
+## 8. Forward test (validación en vivo)
+
+El backtest siempre tiene algo de sesgo, porque uno conoce la historia. El forward test no lo tiene.
+
+1. **Registro diario inmutable**: cada día hábil, después del cierre, GitHub Actions guarda en `registro/` los valores de todos los indicadores y del sensor tal como se veían ese día (fecha, hora UTC, versión del código). Nunca se reescribe una fila pasada.
+2. **Snapshot de datos**: el registro captura también las revisiones de datos (precios ajustados que cambian, series macro revisadas). Queda como una base point-in-time propia.
+3. **Reglas congeladas**: cada versión del sensor tiene un identificador. Las señales en vivo se evalúan solo contra la versión que las generó. Cambiar reglas = nueva versión y nuevo track record.
+4. **Evaluación periódica**: cada semana se completan las etiquetas cuyo horizonte ya venció (Y1…Y8). Cada trimestre se comparan las métricas en vivo con las del backtest. Si las métricas en vivo son mucho peores, es una señal de sobreajuste.
+
+## 9. Criterios para promover algo a "producción"
 
 Un indicador, modelo o regla pasa a producción solo si cumple todo esto:
 

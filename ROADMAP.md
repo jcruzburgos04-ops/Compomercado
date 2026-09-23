@@ -110,7 +110,9 @@ Las canastas propias admiten ponderación igual, por capitalización, por invers
 - **Proveedores** intercambiables (un módulo por fuente), con descarga incremental y reintentos.
 - **Almacén**: Parquet por serie + DuckDB para consultas. Cada registro guarda `fecha_dato`, `fecha_disponible` (cuándo se pudo conocer), `fuente` y `version`.
 - **Calidad**: huecos, splits no ajustados, saltos anómalos, precios congelados y feriados (calendarios de bolsa). También la alineación horaria de mercados globales: Asia cierra antes de la apertura de EE. UU., y Europa se superpone con ella.
-- **Datos pagos opcionales**, más adelante y solo si hacen falta: Norgate (constituyentes históricos y empresas deslistadas, clave para una amplitud sin sesgo de supervivencia), opciones (CBOE DataShop / ORATS) y EOD/intradía confiable (Tiingo, EODHD, Polygon).
+- **Proxies propios**: lo que no existe gratis se construye con fórmulas (amplitud sobre universo propio, índice tipo DIX desde FINRA, posicionamiento estimado de CTAs y fondos de volatilidad, Fear & Greed propio, CCL). Ver [catálogo §D](docs/catalogo_variables.md#d-proxies-propios-para-datos-pagos).
+- **Snapshots diarios** de lo que solo existe "hoy" (cadenas de opciones, acciones en circulación de ETFs) para ir acumulando historia propia desde el primer día.
+- **Datos pagos opcionales**, descartados por ahora: Norgate (constituyentes históricos y empresas deslistadas, clave para una amplitud sin sesgo de supervivencia), opciones (CBOE DataShop / ORATS) y EOD/intradía confiable (Tiingo, EODHD, Polygon).
 
 ### 5.2 Motor de caídas (eventos)
 
@@ -183,7 +185,7 @@ Progresión de modelos. Cada uno debe ganarle al anterior **fuera de muestra**:
 - **M4, régimen con HMM** (calma, transición, estrés).
 - **M5, analogías**: "hoy se parece a…" (vecinos más cercanos contra las huellas previas a cada episodio).
 
-Objetivos a pronosticar (detalle en la [metodología](docs/metodologia_backtest.md)): caída máxima ≥ 5 % en las próximas 21 ruedas, ≥ 10 % en 63 ruedas, volatilidad realizada alta y VIX > 30.
+Objetivos a pronosticar, pensados para **swing** (detalle en la [metodología](docs/metodologia_backtest.md)): caída máxima ≥ 3 % en 5 ruedas, ≥ 5 % en 10 y 21 ruedas, volatilidad realizada alta y VIX > 30. La caída ≥ 10 % en 63 ruedas queda como contexto de fondo.
 
 El semáforo se calibra con **histéresis** (entrar a rojo exige más que salir) y **persistencia mínima**, para evitar señales que cambian todos los días.
 
@@ -197,11 +199,11 @@ El semáforo se calibra con **histéresis** (entrar a rojo exige más que salir)
 | **Coberturas** | Qué cubrió en regímenes parecidos (TLT, oro, dólar, yen, VIX, corto IWM), condicionado a la correlación acciones-bonos del momento |
 | **Reentrada** | Breadth thrust, estructura del VIX normalizada, crédito estabilizado |
 
-**Auditoría "no pisar trades"**: se importa el historial de trades propio (CSV del broker) y se mide, trade por trade, qué habría hecho el sensor:
+**Validación "no pisar trades"** (sin historial de trades propio):
 
-- Qué porcentaje de ganadores habría recortado y cuánto P&L se perdía.
-- Qué porcentaje de perdedores habría evitado y cuánto se ahorraba.
-- **Cómo rinden tus trades en cada estado del sensor.** Si tus trades rinden bien en "amarillo", el sensor no debe reducir en amarillo **para vos**. La calibración se personaliza al estilo de cada operador.
+- **Backtest** sobre estrategias swing de referencia: rupturas de máximos de 20/55 ruedas, pullbacks en tendencia, momentum sectorial con rebalanceo semanal. Se mide qué porcentaje de trades ganadores habría recortado el overlay, cuánto P&L se perdía y cuánto se ahorraba en los perdedores.
+- **Forward test**: desde el primer día se registra cada señal en un archivo inmutable (fecha, hora, valores). Cada semana se evalúa qué pasó después. Las reglas se **congelan** antes de evaluarlas en vivo: si se cambian, arranca un nuevo registro.
+- Si más adelante aparece un historial de trades, se suma la auditoría trade por trade (el módulo queda previsto).
 
 ### 5.7 Screener y canastas propias
 
@@ -252,7 +254,15 @@ ALERTAS NUEVAS
   · Divergencia de amplitud (1ª en 34 ruedas) · VIX sube con SPY en suba 3 días seguidos
 ```
 
-Formatos: reporte HTML o PDF diario, dashboard interactivo (Streamlit) y alertas por Telegram o email ante cambios de estado.
+Formato elegido: **dashboard estático en GitHub Pages**, regenerado por GitHub Actions cada día hábil después del cierre de EE. UU. Es HTML con gráficos interactivos (Plotly), no necesita servidor. Las alertas (Telegram o email) quedan como opción futura.
+
+### 5.9 Módulo Argentina
+
+El foco del sensor es global. Argentina se analiza **como un activo más, expuesto al estrés global**, con su propio panel:
+
+- **Canasta de ADRs** (GGAL, YPF, PAM, BMA, VIST…): beta bajista y captura frente a SPY, EEM y VIX en cada caída global, para saber cuánto arrastra el mundo a Argentina.
+- **Merval en dólares (CCL implícito)**: se calcula con fórmula propia, sin datos pagos. CCL = precio local × ratio del ADR / precio del ADR, promediado en varias especies (p. ej. GGAL.BA vs GGAL).
+- **Riesgo propio vs riesgo global**: descomposición del retorno de la canasta en una parte explicada por el mercado global (SPY, EEM, commodities) y un residuo "local/político". Cuando el residuo domina, las señales globales pierden valor para Argentina, y el dashboard lo advierte.
 
 ---
 
@@ -374,11 +384,11 @@ Se ajustan después de la Fase 1, cuando se conozca la línea base real.
 | Datos | `pandas`, `numpy`, `duckdb`, `pyarrow` |
 | Descarga | `yfinance`, `httpx`, `exchange_calendars` |
 | Estadística y modelos | `scipy`, `statsmodels`, `scikit-learn`, `arch` (GARCH/DCC), `hmmlearn`, `lightgbm`, `shap` |
-| Visualización y dashboard | `plotly`, `streamlit` |
+| Visualización y dashboard | `plotly` → HTML estático en GitHub Pages |
 | CLI y configuración | `typer`, `pydantic` |
 | Calidad | `pytest`, `ruff` |
 
-Automatización diaria con GitHub Actions: sus runners tienen internet y pueden publicar el parte.
+Automatización diaria con GitHub Actions: sus runners tienen internet, publican el dashboard en Pages y guardan el registro forward en el repo.
 
 ```
 Compomercado/
@@ -419,18 +429,20 @@ Compomercado/
 | **Demoras de publicación** (COT, ATS, 13F, encuestas) | `fecha_disponible` en cada dato y tests anti look-ahead |
 | **Shocks exógenos** no anticipables | Pilar de estrés rápido + mapa de refugios preparado de antemano |
 | **Falsa precisión** | Probabilidades con intervalos, tamaño de muestra visible (n=…) en cada afirmación |
-| **Red bloqueada en el entorno cloud de esta sesión** para las fuentes de datos | Desarrollar aquí y correr las descargas localmente o en GitHub Actions, o habilitar esos dominios en la política de red del entorno |
+| **Red bloqueada en el entorno de desarrollo** para las fuentes de datos | Las descargas corren en GitHub Actions; el código se testea localmente con datos sintéticos |
 
 ---
 
-## 10. Decisiones abiertas
+## 10. Decisiones tomadas
 
-1. **Horizonte operativo principal**: intradía, swing (días/semanas) o posición (meses). Define los objetivos (21 vs 63 ruedas) y si hace falta intradía.
-2. **Mercados operados**: solo EE. UU., o también Argentina/LatAm (Merval, ADRs, CEDEARs).
-3. **Presupuesto de datos**: 100 % gratis al inicio, o disposición a pagar (Norgate, opciones).
-4. **Formato de uso diario**: dashboard, reporte por email, Telegram, planilla.
-5. **Historial de trades** disponible para la auditoría "no pisar trades".
-6. **Dónde corre**: PC local, servidor o GitHub Actions.
+| Tema | Decisión | Consecuencia en el diseño |
+|------|----------|---------------------------|
+| Horizonte | **Swing** (días a pocas semanas) | Objetivos principales a **5, 10 y 21 ruedas**; datos diarios al cierre (EOD); sin intradía |
+| Mercados | Se opera Argentina, pero **el foco es el mercado global** (Argentina depende mucho de la política) | El sensor mira EE. UU. + global. Argentina es un módulo aparte: ADRs, Merval en dólares CCL calculado, sensibilidad a estrés global (§5.9) |
+| Datos | **Solo gratuitos.** Lo que no esté disponible se construye con fórmulas propias | Catálogo de proxies propios ([catálogo §D](docs/catalogo_variables.md#d-proxies-propios-para-datos-pagos)) + **snapshots diarios** para acumular historia desde hoy (opciones, flujos de ETF) |
+| Uso diario | **Dashboard** | HTML estático con gráficos interactivos, publicado en **GitHub Pages** |
+| Validación | Sin historial de trades: **backtest del pasado + forward test** | Registro diario inmutable de señales desde el primer día; las reglas se congelan antes de evaluarlas en vivo |
+| Dónde corre | **GitHub** | GitHub Actions corre el pipeline cada día hábil después del cierre, publica el dashboard en Pages y commitea el registro forward |
 
 ---
 

@@ -207,3 +207,27 @@ referencias: []
 estado: candidato           # candidato | implementado | validado | descartado
 resultados_validacion: null  # se completa en F3: AUC, anticipación, % tiempo en alerta, aporte incremental
 ```
+
+---
+
+## D. Proxies propios para datos pagos
+
+Decisión del proyecto: **solo datos gratuitos**. Lo que no existe gratis se construye con fórmulas propias, o se empieza a acumular con snapshots diarios desde el primer día. Estos proxies son aproximaciones: cada uno se valida contra la versión original cuando haya algún tramo gratuito para comparar.
+
+| Dato pago o no disponible | Proxy propio | Cómo se calcula | Historia |
+|---------------------------|--------------|-----------------|----------|
+| Amplitud NYSE (A/D, % sobre medias, máximos-mínimos) | **Amplitud sobre universo propio** | Mismas fórmulas sobre ETFs de sector, industria y país (sin sesgo), 49 industrias Fama-French (sin sesgo) y S&P 500 actual (con sesgo, marcado) | 1926 (FF), 1998 (ETFs) |
+| Put/Call de CBOE (el CSV gratuito termina en 2019) | **Put/Call propio** | Snapshot diario de las cadenas de opciones de SPY, QQQ e IWM (Yahoo): volumen y open interest de puts vs calls | desde el primer snapshot |
+| GEX / gamma de dealers | **GEX propio** | Σ gamma (Black-Scholes, con la IV de cada contrato) × OI × 100 × S² × 1 %, con calls en positivo y puts en negativo (convención estándar) | desde el primer snapshot |
+| Skew de volatilidad | **Skew propio** | IV de puts ≈5 % fuera del dinero − IV at-the-money, vencimiento más cercano a 30 días | desde el primer snapshot |
+| DIX (SqueezeMetrics) | **Índice tipo DIX** | FINRA Reg SHO diario: short volume / volumen total fuera de bolsa, ponderado por dólares sobre los componentes | ≈2009 |
+| Posicionamiento de CTAs | **CTA estimado** | Promedio de señales de tendencia (signo del retorno en 20/60/120/250 ruedas), escalado por volatilidad inversa. **Nivel gatillo** = precio al que cambia cada señal | 1928 |
+| Exposición de fondos de control de volatilidad | **Vol-control estimado** | Exposición = min(1,5; 10 % / vol realizada 21–63d). La variación diaria de la exposición es el flujo estimado | 1928 |
+| Flujos de ETFs | **Δ acciones en circulación** | Snapshot diario de acciones en circulación y activos de cada ETF (Yahoo) | desde el primer snapshot |
+| OAS high yield con historia larga | **Spread de crédito compuesto** | BAA10Y (FRED, 1986) + retorno relativo HYG/IEF (2007) | 1986 |
+| CNN Fear & Greed | **Miedo/codicia propio** | Los 7 componentes replicables: SPY vs media de 125, máximos-mínimos propios, McClellan propio, put/call propio, VIX vs su media de 50, SPY vs TLT a 20d, HYG vs IEF | 2007 (sin put/call, antes) |
+| Correlación implícita (CBOE) | **Correlación realizada promedio** + comparación VIX vs vol de sectores | Correlación media de pares entre sectores; ratio VIX² / Σ w² σ² sectoriales | 1998 |
+| CCL / dólar financiero argentino | **CCL implícito** | Precio local (.BA) × ratio del ADR / precio del ADR, mediana entre varias especies (GGAL, YPF, PAM, BMA…) | ≈2000s |
+| Riesgo propio de Argentina | **Residuo local** | Regresión móvil de la canasta de ADRs contra SPY, EEM y commodities; el residuo acumulado mide el riesgo "local/político" | ≈2000s |
+| Ventana de recompras | **Blackout estimado** | Fechas de resultados (Yahoo): desde ≈30 días antes hasta 2 días después; % del universo en blackout | reciente |
+| Indicadores de régimen pagos | **HMM propio** | Modelo oculto de Markov sobre retorno y volatilidad de SPY | 1928 |
