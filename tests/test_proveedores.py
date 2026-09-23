@@ -81,3 +81,13 @@ def test_cta_estimado():
     p = pd.Series(range(1, 300), dtype=float)
     pos, _ = estado.cta_estimado(p)
     assert pos.iloc[-1] == 1.0
+
+
+def test_completar_ajustado_ultima_rueda():
+    idx = pd.bdate_range("2024-01-01", periods=3)
+    tablas = {
+        "cierre": pd.DataFrame({"SPY": [100.0, 101.0, 102.0]}, index=idx),
+        "cierre_aj": pd.DataFrame({"SPY": [99.0, 100.0, float("nan")]}, index=idx),
+    }
+    yahoo.completar_ajustado(tablas)
+    assert tablas["cierre_aj"]["SPY"].iloc[-1] == 102.0

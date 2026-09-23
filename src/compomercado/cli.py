@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import typer
@@ -37,11 +38,18 @@ def analizar(
     """Corre el análisis y construye el dashboard en ./sitio."""
     from .pipeline import analizar as correr
     from .reportes.dashboard import construir
+    from .reportes.resumen import texto
 
     p = _proyecto(raiz)
     res = correr(p, registrar=registrar, snapshot_opciones=opciones)
     ruta = construir(res, p.dir_sitio)
+    parte = texto(res)
+    typer.echo(parte)
     typer.echo(f"Dashboard: {ruta}")
+    resumen_gh = os.environ.get("GITHUB_STEP_SUMMARY")
+    if resumen_gh:
+        with open(resumen_gh, "a", encoding="utf-8") as f:
+            f.write(f"## Parte diario\n\n```\n{parte}\n```\n")
 
 
 @app.command()

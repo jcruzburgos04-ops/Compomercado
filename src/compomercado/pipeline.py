@@ -157,22 +157,26 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
     arg = _argentina(proyecto, S, precios, mapas.get("SPY"), asinc, pre, rebotes)
 
     # --- registro forward -----------------------------------------------------------------------
-    hoy_ny = pd.Timestamp(datetime.now(ZoneInfo("America/New_York")).date())
+    ahora_ny = datetime.now(ZoneInfo("America/New_York"))
+    hoy_ny = pd.Timestamp(ahora_ny.date())
+    rueda_cerrada = ahora_ny.weekday() < 5 and (ahora_ny.hour, ahora_ny.minute) >= (16, 30)
     if registrar:
         valores = {f"ind_{i.id}": _ultimo(i.serie) for i in indicadores}
         valores.update({f"pilar_{k}": _ultimo(pilares[k]) for k in pilares.columns})
         valores["spy_cierre"] = _ultimo(precios["SPY"])
         if registro.agregar(proyecto.dir_registro, "estado_diario.csv", fecha, valores):
             log.info("Registro forward: fila %s agregada", fecha.date())
-        if snapshot_opciones and fecha == hoy_ny:
+        # Los snapshots muestran "lo de hoy": se toman con la rueda de EE. UU. ya cerrada y se
+        # fechan con el día de Nueva York, sin depender de cuándo actualiza Yahoo los precios.
+        if snapshot_opciones and rueda_cerrada:
             from .datos import opciones
 
             snap = opciones.snapshot_varios(["SPY", "QQQ", "IWM"])
             if snap:
-                registro.agregar(proyecto.dir_registro, "opciones_diario.csv", fecha, snap)
+                registro.agregar(proyecto.dir_registro, "opciones_diario.csv", hoy_ny, snap)
             etfs = opciones.snapshot_etfs(ETFS_SNAPSHOT)
             if etfs:
-                registro.agregar(proyecto.dir_registro, "etfs_diario.csv", fecha, etfs)
+                registro.agregar(proyecto.dir_registro, "etfs_diario.csv", hoy_ny, etfs)
 
     calidad_path = proyecto.dir_datos / "calidad_precios.csv"
     calidad = pd.read_csv(calidad_path, index_col=0) if calidad_path.exists() else pd.DataFrame()

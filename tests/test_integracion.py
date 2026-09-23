@@ -60,3 +60,12 @@ def test_indicadores_sin_look_ahead(tmp_path):
     r_trunc, _ = estado.puntajes(estado.calcular(Series(q)))
     comunes = r_trunc.columns.intersection(r_full.columns)
     assert np.allclose(r_full.loc[fecha, comunes].astype(float), r_trunc.loc[fecha, comunes].astype(float), equal_nan=True)
+
+
+def test_parte_diario_en_texto(tmp_path):
+    from compomercado.reportes.resumen import texto
+
+    p = sintetico.crear(tmp_path)
+    res = analizar(p, registrar=False, snapshot_opciones=False)
+    t = texto(res)
+    assert "RIESGO TOTAL" in t and "MAPA VS SPY" in t and "HISTORIA DESDE 1926" in t and "ARGENTINA" in t

@@ -22,7 +22,6 @@ volatilidad:
   - {ticker: ^SKEW, nombre: "CBOE SKEW"}
   - {ticker: ^MOVE, nombre: "Volatilidad de bonos del Tesoro"}
   - {ticker: ^VXN, nombre: "Volatilidad Nasdaq 100"}
-  - {ticker: ^RVX, nombre: "Volatilidad Russell 2000"}
   - {ticker: ^OVX, nombre: "Volatilidad del petróleo"}
   - {ticker: ^GVZ, nombre: "Volatilidad del oro"}
 
@@ -133,7 +132,7 @@ divisas:
   - {ticker: JPY=X, nombre: "USDJPY"}
   - {ticker: AUDJPY=X, nombre: "AUDJPY"}
   - {ticker: EURUSD=X, nombre: "EURUSD"}
-  - {ticker: CNH=X, nombre: "USDCNH"}
+  - {ticker: CNY=X, nombre: "USDCNY"}
   - {ticker: MXN=X, nombre: "USDMXN"}
   - {ticker: BRL=X, nombre: "USDBRL"}
   - {ticker: CEW, nombre: "Monedas emergentes (ETF)"}

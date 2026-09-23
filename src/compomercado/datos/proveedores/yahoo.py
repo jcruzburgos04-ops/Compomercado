@@ -117,4 +117,24 @@ def descargar(
                     tablas[campo] = tablas.get(campo, pd.DataFrame()).join(tabla[[t]], how="outer")
         fallidos = [t for t in fallidos if t not in recuperados]
 
+    completar_ajustado(tablas)
+    if "cierre" in tablas and "SPY" in tablas["cierre"].columns:
+        log.info("Yahoo: última rueda de SPY %s", tablas["cierre"]["SPY"].last_valid_index())
     return tablas, fallidos
+
+
+def completar_ajustado(tablas: dict[str, pd.DataFrame]) -> None:
+    """Completa el cierre ajustado donde Yahoo lo deja vacío (suele pasar con la última rueda).
+
+    El factor de ajuste de un día es el del día siguiente si no hubo eventos en el medio; en la
+    última rueda el ajustado es igual al cierre (los ajustes solo modifican precios pasados).
+    """
+    if "cierre" not in tablas or "cierre_aj" not in tablas:
+        return
+    c = tablas["cierre"]
+    aj = tablas["cierre_aj"].reindex(index=c.index, columns=c.columns)
+    factor = (aj / c).bfill().fillna(1.0)
+    faltantes = int((aj.isna() & c.notna()).sum().sum())
+    if faltantes:
+        log.info("Yahoo: %d cierres ajustados completados desde el cierre", faltantes)
+    tablas["cierre_aj"] = aj.fillna(c * factor)
