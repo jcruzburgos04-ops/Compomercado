@@ -69,6 +69,15 @@ class Proyecto:
         return self._yaml("analisis.yaml")
 
     @cached_property
+    def screener(self) -> dict:
+        return self._yaml("screener.yaml")
+
+    @cached_property
+    def fichas(self) -> dict:
+        """Ficha de cada indicador (config/fichas.yaml): fórmula, fuente, lag e hipótesis."""
+        return self._yaml("fichas.yaml")
+
+    @cached_property
     def instrumentos(self) -> list[Instrumento]:
         salida = []
         for grupo, valor in self.universos.items():

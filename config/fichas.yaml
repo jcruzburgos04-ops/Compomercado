@@ -1,0 +1,490 @@
+# Ficha de cada indicador (plantilla del catálogo §C). Lo que sale de los datos (historia, estado,
+# peso, AUC, papel en las caídas, valor de hoy) lo completa el pipeline y se ve en la pestaña Fichas.
+#
+# formula: cómo se calcula · fuente: de dónde sale · lag: demora de publicación
+# frecuencia: del dato original · hipotesis: por qué debería anticipar (o acompañar) una caída
+# Todos se normalizan igual: percentil expansivo (solo con el pasado, mínimo 504 ruedas) orientado
+# para que 100 = más riesgo.
+
+# --- Volatilidad y opciones ---------------------------------------------------------------------
+vix:
+  formula: Cierre del VIX
+  fuente: CBOE (respaldo Yahoo ^VIX)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: La volatilidad implícita alta refleja demanda de cobertura; las caídas se agrupan en regímenes de volatilidad alta.
+vix_vix3m:
+  formula: VIX / VIX3M
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Por encima de 1 la curva está invertida, se paga más por la cobertura inmediata que por la de 3 meses; indica estrés agudo.
+vix9d_vix:
+  formula: VIX9D / VIX
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Pánico de muy corto plazo; suele dispararse al comienzo de una caída.
+vvix:
+  formula: Cierre del VVIX
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Volatilidad del VIX; sube cuando se compran coberturas de cola.
+rv21:
+  formula: Desvío de los retornos logarítmicos diarios de SPY en 21 ruedas, anualizado
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: La volatilidad realizada es persistente; los días de alta volatilidad anteceden a otros parecidos.
+vrp:
+  formula: VIX − volatilidad realizada de 21 ruedas (en puntos)
+  fuente: CBOE + Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Negativa = la volatilidad real supera a la que se pagaba; estrés en curso.
+move:
+  formula: Cierre del índice MOVE
+  fuente: Yahoo (^MOVE)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: La volatilidad de los bonos del Tesoro contagia a las acciones (2022, 2023).
+vix3m_vix6m:
+  formula: VIX3M / VIX6M
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Si se invierte también el tramo de 3 a 6 meses, el mercado espera estrés duradero.
+skew:
+  formula: Cierre del CBOE SKEW
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Precio relativo de la protección contra caídas extremas. La literatura lo discute; se evalúa sin preferencia.
+vxn_vix:
+  formula: VXN − VIX
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: "Estrés concentrado en tecnología: la parte del mercado que más pesa en el índice."
+rvx_vix:
+  formula: RVX − VIX
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Estrés concentrado en small caps, más sensibles al crédito y al ciclo.
+ovx:
+  formula: Cierre del OVX
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Shocks del petróleo (guerras, OPEP, demanda) que se trasladan a inflación y márgenes.
+gvz:
+  formula: Cierre del GVZ
+  fuente: CBOE
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Demanda urgente de oro como refugio.
+
+# --- Tendencia y momentum -------------------------------------------------------------------------
+spy_vs_200:
+  formula: SPY / media de 200 ruedas − 1
+  fuente: Yahoo (SPY, ajustado)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Debajo de la media de 200 las caídas son más frecuentes y más profundas (Faber 2007).
+  referencias: [Faber (2007), A Quantitative Approach to Tactical Asset Allocation]
+drawdown:
+  formula: SPY / máximo histórico − 1
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Un mercado ya en caída tiene más probabilidad de seguir cayendo en el corto plazo.
+mom_63:
+  formula: Retorno de SPY en 63 ruedas
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Momentum de serie de tiempo; el negativo persiste (Moskowitz et al. 2012).
+  referencias: [Moskowitz, Ooi y Pedersen (2012), Time Series Momentum]
+spy_vs_50:
+  formula: SPY / media de 50 ruedas − 1
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Tendencia de mediano plazo; más rápida que la de 200.
+pendiente_200:
+  formula: Variación de la media de 200 ruedas en 21 ruedas
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Una media de 200 que se aplana o baja marca un cambio de régimen.
+mom_252:
+  formula: Retorno de SPY en 252 ruedas
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Momentum de 12 meses; negativo = mercado bajista de fondo.
+ret_ajustado:
+  formula: Retorno logarítmico de 63 ruedas / (desvío diario de 63 ruedas × √63)
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Una suba con poca volatilidad es más sana que una igual con saltos.
+overnight_intradia:
+  formula: Suma de 21 ruedas de log(cierre/apertura) − suma de log(apertura/cierre anterior), SPY sin ajustar
+  fuente: Yahoo (SPY, OHLC)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Si sube solo de noche y se vende durante la sesión, hay distribución.
+
+# --- Amplitud e internals -------------------------------------------------------------------------
+pct_200:
+  formula: "% de los 9 sectores SPDR y las industrias del universo sobre su media de 200"
+  fuente: Yahoo (ETFs, sin sesgo de supervivencia)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Cuando pocos sectores acompañan, la suba es frágil.
+pct_50:
+  formula: "% de sectores e industrias sobre su media de 50"
+  fuente: Yahoo (ETFs)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Participación de mediano plazo.
+pct_20:
+  formula: "% de sectores e industrias sobre su media de 20"
+  fuente: Yahoo (ETFs)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Participación de corto plazo.
+mcclellan:
+  formula: EMA 19 − EMA 39 de (suben − bajan) / (suben + bajan) sobre sectores e industrias
+  fuente: Yahoo (ETFs)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Momentum de la amplitud; negativo = cada vez menos activos acompañan.
+max_min:
+  formula: "% del universo en máximos de 252 ruedas − % en mínimos, media de 10 ruedas"
+  fuente: Yahoo (ETFs)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Pocos máximos y muchos mínimos = deterioro interno.
+divergencia:
+  formula: Ruedas de las últimas 21 con SPY a menos de 2 % de su máximo de 252 ruedas y menos del 50 % del universo sobre su media de 50
+  fuente: Yahoo (ETFs + SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: El índice en máximos con pocos acompañando es un techo clásico.
+rsp_spy:
+  formula: Retorno relativo de RSP (igual peso) contra SPY en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Si el igual peso pierde contra el ponderado, la suba depende de pocas empresas.
+mdy_spy:
+  formula: Retorno relativo de MDY (mid caps) contra SPY en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Las mid caps son más cíclicas; su debilidad avisa apetito de riesgo en baja.
+xli_xlu:
+  formula: Retorno relativo de industriales (XLI) contra utilities (XLU) en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: "Cíclicos contra defensivos: rotación hacia defensa antes de las caídas."
+iwm_spy:
+  formula: Retorno relativo de IWM (small caps) contra SPY en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Las small caps sufren primero cuando se endurece el crédito.
+xly_xlp:
+  formula: Retorno relativo de consumo discrecional (XLY) contra consumo básico (XLP) en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Rotación defensiva dentro del consumo.
+sphb_splv:
+  formula: Retorno relativo de alta beta (SPHB) contra baja volatilidad (SPLV) en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: El apetito de riesgo interno del S&P 500.
+canarios:
+  formula: Promedio del retorno relativo contra SPY en 63 ruedas de SMH, KRE, IYT, XRT e ITB
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Sectores que históricamente hacen techo antes que el índice (teoría de Dow, bancos, consumo).
+sp500_pct_200:
+  formula: "% de los componentes actuales del S&P 500 sobre su media de 200"
+  fuente: State Street (tenencias de SPY) + Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: La amplitud de las empresas reales del índice. Historia con sesgo de supervivencia, por eso no suma al puntaje.
+sp500_pct_50:
+  formula: "% de los componentes actuales del S&P 500 sobre su media de 50"
+  fuente: State Street + Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Igual que la anterior, de mediano plazo. Contexto.
+sp500_mcclellan:
+  formula: McClellan sobre los componentes actuales del S&P 500
+  fuente: State Street + Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Momentum de la amplitud de las empresas del índice. Contexto.
+sp500_max_min:
+  formula: "% de componentes en máximos de 52 semanas − % en mínimos, media de 10 ruedas"
+  fuente: State Street + Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Deterioro interno del índice. Contexto.
+
+# --- Crédito y financiamiento ---------------------------------------------------------------------
+hyg_ief:
+  formula: Retorno relativo de HYG contra IEF en 21 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: El high yield que no confirma la suba de las acciones avisa estrés de crédito.
+baa10y:
+  formula: Spread Baa − Tesoro 10 años
+  fuente: FRED (BAA10Y)
+  frecuencia: diaria
+  lag: 1
+  hipotesis: Prima de riesgo corporativo; se abre antes y durante las recesiones.
+baa10y_d21:
+  formula: Variación del spread Baa en 21 ruedas
+  fuente: FRED (BAA10Y)
+  frecuencia: diaria
+  lag: 1
+  hipotesis: La velocidad con que se abre el spread importa más que su nivel.
+stlfsi:
+  formula: Índice de estrés financiero de la Fed de St. Louis
+  fuente: FRED (STLFSI4)
+  frecuencia: semanal
+  lag: 7
+  hipotesis: Resume 18 series de tasas, spreads y volatilidad; alto = estrés sistémico.
+nfci:
+  formula: Índice nacional de condiciones financieras de la Fed de Chicago
+  fuente: FRED (NFCI)
+  frecuencia: semanal
+  lag: 6
+  hipotesis: Condiciones financieras restrictivas anteceden a caídas y recesiones.
+kre_spy:
+  formula: Retorno relativo de bancos regionales (KRE) contra SPY en 21 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: "Estrés bancario (2023): los bancos regionales caen antes."
+lqd_ief:
+  formula: Retorno relativo de LQD contra IEF en 21 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Crédito de grado de inversión que no confirma.
+emb_ief:
+  formula: Retorno relativo de EMB contra IEF en 21 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: "Deuda emergente en dólares: primera en sufrir con dólar fuerte y aversión al riesgo."
+cp_spread:
+  formula: Tasa del papel comercial financiero AA a 3 meses − letras del Tesoro a 3 meses
+  fuente: FRED (DCPF3M, DTB3)
+  frecuencia: diaria
+  lag: 1
+  hipotesis: Costo de financiamiento de corto plazo de los bancos; se disparó en 2007-08 y 2020.
+liquidez_neta:
+  formula: Variación en 63 ruedas de (balance de la Fed − cuenta del Tesoro − repos reversos)
+  fuente: FRED (WALCL, WTREGEN, RRPONTSYD)
+  frecuencia: semanal/diaria
+  lag: 2
+  hipotesis: Menos liquidez del sistema = menos soporte para los activos de riesgo.
+
+# --- Cross-asset y macro --------------------------------------------------------------------------
+usdjpy_21:
+  formula: Variación de USDJPY en 21 ruedas
+  fuente: Yahoo (JPY=X)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Un yen que se fortalece rápido desarma el carry trade (agosto de 2024).
+audjpy_21:
+  formula: Variación de AUDJPY en 21 ruedas
+  fuente: Yahoo (AUDJPY=X)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Barómetro clásico del apetito de riesgo global.
+dxy_21:
+  formula: Variación del índice dólar (DXY) en 21 ruedas
+  fuente: Yahoo (DX-Y.NYB)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Un dólar fuerte y rápido endurece las condiciones financieras globales.
+cobre_oro:
+  formula: Retorno relativo del cobre contra el oro en 63 ruedas (futuros)
+  fuente: Yahoo (HG=F, GC=F)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Crecimiento (cobre) contra miedo (oro).
+dgs10_d63:
+  formula: Variación de la tasa del Tesoro a 10 años en 63 ruedas
+  fuente: FRED (DGS10)
+  frecuencia: diaria
+  lag: 1
+  hipotesis: Contexto para clasificar el tipo de caída (tasas o crecimiento); no suma al puntaje.
+curva:
+  formula: Tasa 10 años − 2 años
+  fuente: FRED (T10Y2Y)
+  frecuencia: diaria
+  lag: 1
+  hipotesis: La inversión anticipa recesiones con mucha demora; contexto.
+curva_3m:
+  formula: Tasa 10 años − 3 meses
+  fuente: FRED (T10Y3M)
+  frecuencia: diaria
+  lag: 1
+  hipotesis: La versión de la curva que mejor anticipó recesiones; contexto.
+tasas_shock:
+  formula: Variación de la tasa a 10 años en 21 ruedas / (desvío diario de 252 ruedas × √21)
+  fuente: FRED (DGS10)
+  frecuencia: diaria
+  lag: 1
+  hipotesis: Subas bruscas de la tasa larga provocan caídas de tipo tasas (2018, 2022).
+petroleo_shock:
+  formula: Valor absoluto del retorno de 21 ruedas del WTI en desvíos de su historia de 252 ruedas
+  fuente: Yahoo (CL=F)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Movimientos grandes del petróleo, en cualquier sentido, alteran inflación, márgenes y crecimiento.
+btc_21:
+  formula: Retorno de Bitcoin en 21 días
+  fuente: Yahoo (BTC-USD)
+  frecuencia: diaria (cotiza todos los días)
+  lag: 0
+  hipotesis: Apetito de riesgo especulativo; suele caer antes que las acciones.
+desempleo:
+  formula: Media de 4 semanas de los pedidos iniciales de desempleo / su mínimo de 52 semanas − 1
+  fuente: FRED (ICSA)
+  frecuencia: semanal
+  lag: 6
+  hipotesis: El deterioro laboral antecede a las recesiones.
+sahm:
+  formula: Regla de Sahm en tiempo real
+  fuente: FRED (SAHMREALTIME)
+  frecuencia: mensual
+  lag: 40
+  hipotesis: 0,5 o más marcó el inicio de todas las recesiones desde 1970.
+  referencias: [Sahm (2019), Direct Stimulus Payments to Individuals]
+corr_acc_bonos:
+  formula: Correlación de 63 ruedas entre los retornos de SPY y TLT
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Positiva = los bonos no cubren (2022). Sirve para elegir cobertura; como anticipador funciona al revés.
+
+# --- Global ---------------------------------------------------------------------------------------
+pct_200_global:
+  formula: "% de los ETFs de países del universo (G7 y mayores bolsas) sobre su media de 200"
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Amplitud global; cuando el mundo deja de acompañar, EE. UU. suele seguir.
+eem_spy:
+  formula: Retorno relativo de EEM contra SPY en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Los emergentes son más sensibles al dólar y a la liquidez global.
+efa_spy:
+  formula: Retorno relativo de EFA contra SPY en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Liderazgo de los desarrollados fuera de EE. UU.; contexto.
+china_21:
+  formula: Retorno relativo de FXI contra SPY en 21 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Estrés en China (2015-16) contagia al resto.
+usdcny_21:
+  formula: Variación de USDCNY en 21 ruedas
+  fuente: Yahoo (CNY=X)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Una devaluación del yuan (agosto de 2015) es una señal de estrés chino.
+cew_21:
+  formula: Retorno del ETF de monedas emergentes (CEW) en 21 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Monedas emergentes débiles = aversión al riesgo global.
+europa_5d:
+  formula: Promedio del retorno de 5 ruedas de DAX, Euro Stoxx 50, FTSE 100 y CAC 40
+  fuente: Yahoo (índices)
+  frecuencia: diaria
+  lag: 0 (Europa cierra antes que EE. UU.)
+  hipotesis: Debilidad europea que llega antes que la de EE. UU.
+asia_5d:
+  formula: Promedio del retorno de 5 ruedas de Nikkei, Hang Seng, Kospi y Taiwán
+  fuente: Yahoo (índices)
+  frecuencia: diaria
+  lag: 0 (Asia cierra antes que EE. UU.)
+  hipotesis: Kospi y Taiwán (semiconductores) suelen hacer techo antes.
+
+# --- Estructura de correlación --------------------------------------------------------------------
+corr_prom:
+  formula: Correlación promedio entre pares de los 9 sectores SPDR en 63 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Cuando todo se mueve junto, la diversificación desaparece.
+absorcion:
+  formula: Varianza explicada por los 2 primeros componentes principales de los 9 sectores, 252 ruedas
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Mercado "compactado" = más frágil ante shocks (Kritzman et al. 2011).
+  referencias: [Kritzman, Li, Page y Rigobon (2011), Principal Components as a Measure of Systemic Risk]
+turbulencia:
+  formula: Distancia de Mahalanobis de los retornos del día de los 9 sectores contra su historia de 252 ruedas, media de 10
+  fuente: Yahoo
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Movimientos inusuales entre activos anteceden períodos de pérdidas (Kritzman y Li 2010).
+  referencias: [Kritzman y Li (2010), Skulls, Financial Turbulence, and Risk Management]
+
+# --- Flujos estimados -----------------------------------------------------------------------------
+distribucion:
+  formula: Ruedas de las últimas 25 en que SPY cayó 0,2 % o más con más volumen que la anterior
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Ventas institucionales repetidas (método IBD).
+clv:
+  formula: Media de 21 ruedas de ((cierre − mínimo) − (máximo − cierre)) / (máximo − mínimo), SPY sin ajustar
+  fuente: Yahoo (SPY, OHLC)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Cierres repetidos en la parte baja del rango = venta durante la sesión.
+cta:
+  formula: Promedio del signo del retorno de SPY en 21, 63, 126 y 252 ruedas (−1 a +1)
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Los fondos de tendencia venden cuando se dan vuelta sus señales y amplifican las caídas.
+cta_gatillo:
+  formula: Variación de SPY que daría vuelta la señal de tendencia más cercana
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Cuánto falta para que los CTAs empiecen a vender; contexto.
+vol_control:
+  formula: min(1,5; 10 % / máximo de la volatilidad realizada de 21 y 63 ruedas)
+  fuente: Yahoo (SPY)
+  frecuencia: diaria
+  lag: 0
+  hipotesis: Fondos que ajustan exposición por volatilidad venden cuando sube; con exposición alta hay más para vender.

@@ -185,3 +185,21 @@ def test_parser_bls_solo_tablas():
     <tr><td>October 2026</td><td>Nov. 12, 2026</td><td>08:30 AM</td></tr></table>"""
     t = cal.parsear_bls(html, "cpi")
     assert list(t["fecha"]) == [pd.Timestamp("2026-10-15"), pd.Timestamp("2026-11-12")]
+
+
+def test_screener_consultas_y_condiciones():
+    from compomercado.analitica import screener
+
+    t = pd.DataFrame({"grupo": ["sectores", "acciones", "acciones"], "rs_63_pct": [90, 75, 20],
+                      "beta_bajista": [0.8, 1.5, 1.4]}, index=["XLP", "AAA", "BBB"])
+    screens = {
+        "fuertes": {"consulta": "rs_63_pct >= 70", "orden": "rs_63_pct"},
+        "acciones_beta": {"grupos": ["acciones"], "consulta": "beta_bajista >= 1.2", "orden": "beta_bajista"},
+        "solo_en_caida": {"consulta": "rs_63_pct >= 80", "solo_si": "drawdown_spy <= -0.05"},
+        "roto": {"consulta": "columna_que_no_existe > 1"},
+    }
+    r = {s["clave"]: s for s in screener.aplicar(t, screens, {"drawdown_spy": -0.02})}
+    assert list(r["fuertes"]["resultado"].index) == ["XLP", "AAA"]
+    assert list(r["acciones_beta"]["resultado"].index) == ["AAA", "BBB"]
+    assert r["solo_en_caida"]["estado"] == "no_aplica"
+    assert r["roto"]["estado"] == "error"

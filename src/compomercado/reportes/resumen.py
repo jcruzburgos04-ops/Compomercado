@@ -175,6 +175,21 @@ def texto(res: Resultados) -> str:
                 for _, f in hu.caidas_parecidas.head(5).iterrows()))
         L.append("")
 
+    if res.screener:
+        L.append("SCREENER")
+        for s in res.screener:
+            if s["estado"] == "no_aplica":
+                L.append(f"  {s['titulo']}: no aplica hoy")
+            elif s["estado"] == "error":
+                L.append(f"  {s['titulo']}: error en la consulta")
+            else:
+                t = s["resultado"]
+                L.append(f"  {s['titulo']} ({len(t)}): " + (", ".join(t.index[:10]) if len(t) else "ninguno"))
+        for k, v in res.canastas_corr.items():
+            if "corr_63" in v and "corr_252" in v:
+                L.append(f"  Correlación interna {k}: {v['corr_63']:.2f} (63r) vs {v['corr_252']:.2f} (252r)")
+        L.append("")
+
     h = res.historia_larga
     if h is not None:
         tb = h.tabla.sort_values("puntaje_refugio", ascending=False)

@@ -1,0 +1,43 @@
+# Screener sobre el mapa de comportamiento contra SPY (roadmap §5.7).
+# Cada screen es una consulta sobre las columnas del mapa (ver la pestaña Mapa: pasar el mouse por los
+# encabezados). Se pueden agregar screens propios copiando uno de estos.
+#
+# consulta: condición (sintaxis de pandas .query)       orden: columna para ordenar
+# ascendente: true/false (por defecto false)             limite: cuántos mostrar (por defecto 20)
+# grupos: lista de grupos del universo a considerar (por defecto todos)
+# solo_si: condición sobre el mercado de hoy; si no se cumple, el screen se muestra como "no aplica hoy".
+#          Variables: drawdown_spy (caída desde el máximo, ej. -0.05), riesgo_total (0-100)
+
+refugios_con_fuerza:
+  titulo: Refugios con fuerza
+  descripcion: Aguantan las caídas (refugio 60 o más) y hoy están en el 40 % más fuerte (fuerza relativa de 63 ruedas).
+  consulta: "puntaje_refugio >= 60 and rs_63_pct >= 60"
+  orden: puntaje_refugio
+
+canarios_debilitandose:
+  titulo: Canarios debilitándose
+  descripcion: Industrias que en las caídas hicieron techo antes que SPY, con la fuerza de 21 ruedas peor que la de 63 y en la mitad inferior.
+  grupos: [industrias, sectores]
+  consulta: "lag_techo_mediano < 0 and rs_21_pct < 50 and rs_21_pct < rs_63_pct"
+  orden: rs_21_pct
+  ascendente: true
+
+fortaleza_en_debilidad:
+  titulo: Fortaleza en debilidad
+  descripcion: En el 20 % más fuerte mientras SPY está 5 % o más abajo de su máximo. Suelen liderar la salida.
+  consulta: "rs_63_pct >= 80"
+  solo_si: "drawdown_spy <= -0.05"
+  orden: rs_63_pct
+
+reducir_primero:
+  titulo: Reducir primero si sube el riesgo
+  descripcion: Beta bajista 1,2 o más y fuerza relativa de 63 ruedas en la mitad inferior. Los líderes con fuerza no aparecen.
+  consulta: "beta_bajista >= 1.2 and rs_63_pct < 50"
+  orden: beta_bajista
+
+acciones_que_aguantan:
+  titulo: Acciones que aguantan las caídas y hoy tienen fuerza
+  descripcion: Acciones de tus canastas con captura bajista menor a 0,8, fuerza relativa de 63 ruedas en el 30 % superior y correlación en estrés menor a 0,7.
+  grupos: [acciones]
+  consulta: "captura_mediana < 0.8 and rs_63_pct >= 70 and corr_estres < 0.7"
+  orden: rs_63_pct

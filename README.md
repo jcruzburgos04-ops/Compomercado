@@ -16,10 +16,12 @@ la apertura de EE. UU., con la rueda anterior completa) con GitHub Actions ([`di
 
 Secciones:
 
-- **Estado del mercado**: puntaje de riesgo por pilar (preliminar) y qué pasó históricamente después de cada nivel.
+- **Estado del mercado**: puntaje de riesgo por pilar, amplitud del S&P 500, calendario de las próximas semanas y qué pasó históricamente después de cada nivel.
 - **Mapa de comportamiento**: cada sector, industria, factor, país, activo y canasta contra SPY, QQQ, IWM, EFA y EEM. Incluye refugios con fuerza hoy y qué reducir primero.
 - **Caídas**: cada tramo ≥5 % de SPY desde 1993, con su huella macro y su tipo.
 - **Huellas y análogos**: cómo estaban los indicadores y pilares un mes y una semana antes, en el pico, en la confirmación y en el valle de cada caída; qué se repite; y qué días del pasado se parecen a hoy, con su probabilidad de caída evaluada fuera de muestra.
+- **Screener**: refugios con fuerza, canarios debilitándose, fortaleza en debilidad, qué reducir primero y acciones de tus canastas; screens propios en `config/screener.yaml`.
+- **Fichas**: qué mide cada indicador, de dónde sale, su demora, su hipótesis y qué mostraron los datos.
 - **Historia desde 1926**: 49 industrias Fama-French en cada mercado bajista.
 - **Correlaciones**: matriz actual, absorption ratio y turbulencia.
 - **Registro forward**: señales guardadas día a día (rama `registro`), más snapshots propios de opciones.
@@ -41,8 +43,8 @@ Los universos, canastas propias y parámetros se editan en [`config/`](config/).
 |------|--------|
 | F0: cimientos de datos | ✓ Yahoo, FRED (con demora de publicación), CBOE, Ken French; almacén Parquet; controles de calidad |
 | F1: caídas + mapa de comportamiento | ✓ Tramos zigzag y episodios bajo el agua, huella macro, métricas por activo y episodio, puntajes refugio/rebote, historia desde 1926 |
-| F2: indicadores + dashboard | En curso: ~35 indicadores en 8 pilares, dashboard en Pages, registro forward y snapshots de opciones |
-| F3: sensor validado | Pendiente |
+| F2: indicadores + dashboard | ✓ 77 indicadores: 8 pilares que suman al puntaje (la ponderación elige cuáles cuentan), amplitud del S&P 500 actual y calendario como contexto; ficha por indicador; screener; dashboard en Pages; registro forward. Puerta: test anti look-ahead y test de fichas en verde |
+| F3: sensor validado | Siguiente. Ya adelantado: ponderación walk-forward, huellas de las caídas y análogos, evaluados fuera de muestra |
 | F4: backtest de overlay y rotación | Pendiente |
 | F5: flujo institucional (COT, FINRA, insiders) | Pendiente |
 

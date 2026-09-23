@@ -34,6 +34,10 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
     assert "Argentina" not in html and "CCL" not in html
     assert "Amplitud del S&amp;P 500" in html or "Amplitud del S&P 500" in html
     assert "Calendario: próximas 5 semanas" in html
+    assert "Sin ficha escrita" not in html and 'class="ficha"' in html
+    assert "Refugios con fuerza" in html and "La consulta tiene un error" not in html
+    assert {s["estado"] for s in res.screener} <= {"ok", "no_aplica"}
+    assert "acciones" in set(res.mapas["SPY"].tabla["grupo"])
     assert "Esta sección falló" not in html
     # Los datos del test son sintéticos: el tablero tiene que avisarlo.
     assert "DATOS DE PRUEBA" in html and "Datos reales descargados" not in html
@@ -53,7 +57,7 @@ def test_indicadores_sin_look_ahead(tmp_path):
     q = sintetico.crear(tmp_path / "truncado")
     alm = Almacen(q.dir_datos)
     for nombre in ["precios/cierre_aj", "precios/cierre", "precios/apertura", "precios/maximo", "precios/minimo",
-                   "precios/volumen", "cboe"]:
+                   "precios/volumen", "cboe", "sp500/cierre_aj"]:
         alm.guardar(nombre, alm.leer(nombre).loc[:corte])
     # FRED: el dato con fecha d se publica en d + lag, así que a la fecha de corte solo se conocía hasta corte - lag.
     fred = alm.leer("fred")
@@ -96,3 +100,17 @@ def test_sello_de_origen_real(tmp_path):
     assert alm.origen()["real"]
     alm.registrar_descarga("fred", origen="sintetico", fallidos=[])
     assert not alm.origen()["real"]
+
+
+def test_cada_indicador_tiene_su_ficha(tmp_path):
+    """Puerta de la Fase 2: cada indicador tiene su ficha completa en config/fichas.yaml."""
+    p = sintetico.crear(tmp_path)
+    ids = [i.id for i in estado.calcular(Series(p))]
+    fichas = p.fichas
+    faltan = [i for i in ids if i not in fichas]
+    assert not faltan, f"Indicadores sin ficha: {faltan}"
+    campos = ("formula", "fuente", "frecuencia", "lag", "hipotesis")
+    incompletas = {i: [c for c in campos if fichas[i].get(c) in (None, "")] for i in ids}
+    assert not {i: c for i, c in incompletas.items() if c}, incompletas
+    sobran = set(fichas) - set(ids)
+    assert not sobran, f"Fichas de indicadores que no existen: {sobran}"

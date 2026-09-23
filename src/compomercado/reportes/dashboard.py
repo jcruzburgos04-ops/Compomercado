@@ -849,6 +849,114 @@ es orientativo.</p>
 """
 
 
+def _fichas_tabla(res: Resultados) -> pd.DataFrame:
+    """Una fila por indicador: lo escrito en config/fichas.yaml + lo que sale de los datos."""
+    pond = res.ponderacion
+    vig = pond.pesos_vigentes.indicadores if pond is not None else pd.DataFrame()
+    lec = res.huellas.lectura if res.huellas is not None else pd.DataFrame()
+    lec_c = res.huellas.lectura_calma if res.huellas is not None else pd.DataFrame()
+    filas = []
+    for ind in res.indicadores:
+        f = res.fichas.get(ind.id, {}) or {}
+        s = ind.serie.dropna()
+        r = res.riesgo[ind.id].dropna() if ind.id in res.riesgo else pd.Series(dtype=float)
+        fila = {
+            "id": ind.id, "nombre": ind.nombre, "pilar": PILARES.get(ind.pilar, ind.pilar),
+            "signo": {1: "↑ más = más riesgo", -1: "↓ menos = más riesgo", 0: "contexto (no suma)"}[ind.signo],
+            "formula": f.get("formula", ""), "fuente": f.get("fuente", ""), "frecuencia": f.get("frecuencia", ""),
+            "lag": f.get("lag", ""), "hipotesis": f.get("hipotesis", ""),
+            "referencias": "; ".join(f.get("referencias", []) or []),
+            "desde": s.index[0] if len(s) else pd.NaT, "hoy": fmt(s.iloc[-1], ind.formato) if len(s) else "—",
+            "percentil": r.iloc[-1] if len(r) else np.nan,
+            "estado": "contexto" if not ind.en_compuesto else (vig["estado"].get(ind.id, "") if not vig.empty else ""),
+            "peso": vig["peso"].get(ind.id, np.nan) if not vig.empty else np.nan,
+        }
+        for k in ("auc_y1", "auc_y2", "auc_y3", "auc_media"):
+            fila[k] = vig[k].get(ind.id, np.nan) if not vig.empty and k in vig else np.nan
+        fila["papel"] = lec["papel"].get(ind.id, "") if not lec.empty else ""
+        fila["papel_calma"] = lec_c["papel"].get(ind.id, "") if not lec_c.empty else ""
+        filas.append(fila)
+    return pd.DataFrame(filas)
+
+
+def seccion_fichas(res: Resultados) -> str:
+    t = _fichas_tabla(res)
+    if t.empty:
+        return "<p>Sin indicadores.</p>"
+    sin_ficha = t[t["formula"] == ""]["id"].tolist()
+    partes = []
+    orden = {n: k for k, n in enumerate(PILARES.values())}
+    for pilar, g in sorted(t.groupby("pilar"), key=lambda x: orden.get(x[0], 99)):
+        items = []
+        for _, f in g.iterrows():
+            peso = fmt(f["peso"], "pct0") if pd.notna(f["peso"]) else "—"
+            detalle = [("Fórmula", f["formula"]), ("Fuente", f["fuente"]), ("Frecuencia", f["frecuencia"]),
+                       ("Demora de publicación", f"{f['lag']} días" if str(f["lag"]).isdigit() else f["lag"]),
+                       ("Sentido", f["signo"]), ("Hipótesis", f["hipotesis"]),
+                       ("Historia desde", fmt(f["desde"], "fecha")), ("Hoy", f"{f['hoy']} (percentil de riesgo "
+                                                                            f"{fmt(f['percentil'], 'puntaje')})"),
+                       ("Estado en la ponderación", f["estado"] or "—"), ("Peso en su pilar", peso),
+                       ("AUC (3 %/5r · 5 %/10r · 5 %/21r)",
+                        " · ".join(fmt(f[k], "num") for k in ("auc_y1", "auc_y2", "auc_y3"))),
+                       ("Papel en las caídas", f["papel"] or "—"), ("Papel en las caídas desde la calma", f["papel_calma"] or "—")]
+            if f["referencias"]:
+                detalle.append(("Referencias", f["referencias"]))
+            filas = "".join(f"<tr><th>{html.escape(k)}</th><td>{html.escape(str(v))}</td></tr>" for k, v in detalle)
+            resumen = (f'<strong>{html.escape(f["nombre"])}</strong> <span class="pie">· {html.escape(f["estado"] or "")}'
+                       f' · peso {peso} · hoy p{fmt(f["percentil"], "puntaje")}</span>')
+            items.append(f'<details class="ficha"><summary>{resumen}</summary><table class="t ficha-t">{filas}</table></details>')
+        partes.append(f"<h3>{html.escape(pilar)} ({len(g)})</h3>{''.join(items)}")
+    aviso = (f'<p class="pie">Sin ficha escrita: {html.escape(", ".join(sin_ficha))}.</p>' if sin_ficha else "")
+    n_cuentan = int(((t["estado"] == "incluido") & (t["peso"] > 0)).sum())
+    return f"""
+<p>Una ficha por indicador: qué mide, de dónde sale, con qué demora se publica, por qué debería anticipar una caída y
+qué mostraron los datos. Hay {len(t)} indicadores; {n_cuentan} cuentan hoy en el puntaje. Lo escrito vive en
+<code>config/fichas.yaml</code>; lo medido se recalcula en cada corrida. Clic en un indicador para abrir su ficha.</p>
+{aviso}{"".join(partes)}
+"""
+
+
+def seccion_screener(res: Resultados) -> str:
+    if not res.screener:
+        return "<p>Sin screens configurados (config/screener.yaml).</p>"
+    cols = [("__indice__", "Activo", "texto"), ("nombre", "Nombre", "texto"), ("grupo", "Grupo", "texto"),
+            ("puntaje_refugio", "Refugio", "puntaje"), ("rs_21_pct", "Fuerza rel. 21d", "puntaje"),
+            ("rs_63_pct", "Fuerza rel. 63d", "puntaje"), ("beta_bajista", "Beta ↓", "num"),
+            ("captura_mediana", "Captura mediana", "num"), ("corr_estres", "Correl. estrés", "num"),
+            ("lag_techo_mediano", "Techo (ruedas)", "int", "Negativo = hace techo antes que SPY")]
+    partes = []
+    for s in res.screener:
+        cabeza = (f"<h3>{html.escape(s['titulo'])}</h3><p class=\"pie\">{html.escape(s['descripcion'])} "
+                  f"<code>{html.escape(s['consulta'])}</code></p>")
+        if s["estado"] == "no_aplica":
+            cuerpo = "<p>No aplica hoy (no se cumple la condición del mercado).</p>"
+        elif s["estado"] == "error":
+            cuerpo = f"<p>La consulta tiene un error: {html.escape(s.get('error', ''))}</p>"
+        elif s["resultado"].empty:
+            cuerpo = "<p>Ningún activo cumple hoy.</p>"
+        else:
+            t = s["resultado"]
+            cuerpo = tabla(t, [c for c in cols if c[0] == "__indice__" or c[0] in t.columns])
+        partes.append(cabeza + cuerpo)
+    corr = ""
+    if res.canastas_corr:
+        filas = [{"canasta": k, "n": v.get("n"), "c63": v.get("corr_63"), "c252": v.get("corr_252"),
+                  "cambio": (v.get("corr_63", np.nan) - v.get("corr_252", np.nan))} for k, v in res.canastas_corr.items()]
+        corr = ("<h3>Correlación interna de tus canastas</h3><p class=\"pie\">Correlación promedio entre los componentes. "
+                "Si la de 63 ruedas sube mucho sobre la de un año, la canasta está diversificando menos.</p>"
+                + tabla(pd.DataFrame(filas), [("canasta", "Canasta", "texto"), ("n", "Componentes", "int"),
+                                              ("c63", "63 ruedas", "num"), ("c252", "252 ruedas", "num"),
+                                              ("cambio", "Cambio", "num")]))
+    vacia = [c for c in ("mis_posiciones",) if c not in res.canastas_corr]
+    nota = ("<p class=\"pie\">Cargá tus posiciones en <code>config/canastas.yaml</code> (canasta mis_posiciones) para "
+            "ver su correlación interna y sumarlas al screener.</p>" if vacia else "")
+    return f"""
+<p>Búsquedas sobre el mapa de comportamiento contra SPY: sectores, industrias, factores, países, activos, canastas y
+las acciones de tus canastas. Los screens se editan en <code>config/screener.yaml</code>; se pueden agregar propios.</p>
+{"".join(partes)}{corr}{nota}
+"""
+
+
 def seccion_historia(res: Resultados) -> str:
     h = res.historia_larga
     if h is None:
@@ -1025,6 +1133,10 @@ p { max-width: 900px; }
 .aviso-prueba { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; border: 2px solid var(--critical); color: var(--tinta); font-weight: 600; }
 .estado.good { --c: var(--good); } .estado.warning { --c: var(--warning); } .estado.serious { --c: var(--serious); } .estado.critical { --c: var(--critical); }
 .nota { flex: 1; min-width: 260px; background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 4px 16px; font-size: 14px; }
+details.ficha { border-bottom: 1px solid var(--grilla); padding: 6px 0; }
+details.ficha summary { cursor: pointer; }
+table.ficha-t th { width: 220px; white-space: normal; cursor: default; }
+table.ficha-t td { white-space: normal; }
 .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
 .tabla-envoltura { overflow-x: auto; border: 1px solid var(--borde); border-radius: 8px; background: var(--superficie); max-height: 640px; overflow-y: auto; }
 table.t { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -1135,6 +1247,8 @@ SECCIONES = [
     ("mapa", "Mapa de comportamiento", seccion_mapa),
     ("caidas", "Caídas", seccion_episodios),
     ("huellas", "Huellas y análogos", seccion_huellas),
+    ("screener", "Screener", seccion_screener),
+    ("fichas", "Fichas", seccion_fichas),
     ("historia", "Historia desde 1926", seccion_historia),
     ("correlacion", "Correlaciones", seccion_correlacion),
     ("forward", "Registro forward", seccion_forward),

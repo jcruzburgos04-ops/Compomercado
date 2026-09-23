@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import registro
-from .analitica import calendario, canastas, huellas
+from .analitica import calendario, canastas, huellas, screener
 from .analitica import comportamiento as comp
 from .config import Proyecto
 from .datos.series import Series
@@ -78,6 +78,9 @@ class Resultados:
     huellas: huellas.Huellas | None = None
     sp500: dict = field(default_factory=dict)
     calendario: dict = field(default_factory=dict)
+    fichas: dict = field(default_factory=dict)
+    screener: list = field(default_factory=list)
+    canastas_corr: dict = field(default_factory=dict)
 
 
 def _nombre_canasta(nombre: str) -> str:
@@ -105,7 +108,16 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         precios[col] = serie.reindex(cal)
         nombres[col] = c.descripcion
         nombres_canastas.append(col)
-    universo_mapa = [t for t in universo + nombres_canastas if t in precios.columns]
+    # Acciones de las canastas: entran al mapa una por una (para el screener y para comparar acciones).
+    comp_sp = S.sp500_componentes()
+    nombres_sp = dict(zip(comp_sp["ticker"], comp_sp["nombre"], strict=True)) if not comp_sp.empty else {}
+    acciones = []
+    for c in proyecto.canastas:
+        for t in c.tickers:
+            if t in precios.columns and t not in universo and t not in acciones:
+                acciones.append(t)
+                nombres.setdefault(t, str(nombres_sp.get(t, t)).title() if t in nombres_sp else t)
+    universo_mapa = [t for t in universo + nombres_canastas + acciones if t in precios.columns]
     asinc = {t for t in universo_mapa if proyecto.es_asincronico(t)}
 
     # --- episodios de SPY con huella macro --------------------------------------------------
@@ -130,7 +142,8 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
             eps["tipo"] = caidas.clasificar(eps, cfg.get("tipos_caida", []))
         log.info("Mapa vs %s: %d episodios", ref, len(eps))
         tabla, larga = comp.mapa(precios[universo_mapa].loc[pm.index[0]:], pm, eps, asinc, pre=pre, rebotes=rebotes)
-        tabla["grupo"] = [proyecto.grupo_de.get(t, "canasta" if t.startswith("canasta:") else "") for t in tabla.index]
+        tabla["grupo"] = [proyecto.grupo_de.get(t, "canasta" if t.startswith("canasta:") else "acciones")
+                          for t in tabla.index]
         mapa = MapaRef(ref, eps, tabla, larga)
         if "tipo" in eps:
             mapa.por_tipo = comp.por_tipo(larga, eps["tipo"])
@@ -168,6 +181,18 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         huellas_spy = huellas.analizar(mapas["SPY"].episodios, riesgo, pilares_igual, pilares["total"], spy)
 
     sp500_info = _sp500(S)
+
+    # --- screener y correlación interna de las canastas ------------------------------------------
+    screens = []
+    if "SPY" in mapas:
+        t_spy = mapas["SPY"].tabla.copy()
+        t_spy.insert(0, "nombre", [nombres.get(i, i) for i in t_spy.index])
+        dd = spy.dropna()
+        contexto = {"drawdown_spy": float(dd.iloc[-1] / dd.max() - 1),
+                    "riesgo_total": _ultimo(pilares["total"]) if "total" in pilares else np.nan}
+        screens = screener.aplicar(t_spy, proyecto.screener, contexto)
+    canastas_corr = {c.nombre: screener.correlacion_interna(precios, c.tickers) for c in proyecto.canastas}
+    canastas_corr = {k: v for k, v in canastas_corr.items() if v}
     calendario_info = _calendario(proyecto, S, fecha)
 
     # --- correlaciones actuales ---------------------------------------------------------------
@@ -235,6 +260,9 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         huellas=huellas_spy,
         sp500=sp500_info,
         calendario=calendario_info,
+        fichas=proyecto.fichas,
+        screener=screens,
+        canastas_corr=canastas_corr,
     )
 
 
