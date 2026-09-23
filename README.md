@@ -11,8 +11,8 @@ Todo validado con backtesting walk-forward y sin look-ahead.
 
 ## Dashboard
 
-**https://jcruzburgos04-ops.github.io/Compomercado/**. Se regenera cada día hábil a las 22:30 UTC (después
-del cierre de EE. UU.) con GitHub Actions ([`diario.yml`](.github/workflows/diario.yml)).
+**https://jcruzburgos04-ops.github.io/Compomercado/**. Se regenera de martes a sábado a las 10:30 UTC (antes de
+la apertura de EE. UU., con la rueda anterior completa) con GitHub Actions ([`diario.yml`](.github/workflows/diario.yml)).
 
 Secciones:
 

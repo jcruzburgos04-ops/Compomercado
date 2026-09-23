@@ -27,6 +27,8 @@ def gamma_bs(S: float, K: np.ndarray, T: np.ndarray, iv: np.ndarray, r: float = 
 def resumir_cadena(cadena: pd.DataFrame, spot: float, hoy: pd.Timestamp) -> dict[str, float]:
     """Métricas agregadas de una cadena con columnas: tipo (call/put), vencimiento, strike,
     volume, openInterest, impliedVolatility."""
+    if not np.isfinite(spot) or spot <= 0:
+        raise ValueError("spot inválido")
     c = cadena.copy()
     c["volume"] = c["volume"].fillna(0)
     c["openInterest"] = c["openInterest"].fillna(0)
@@ -53,8 +55,8 @@ def resumir_cadena(cadena: pd.DataFrame, spot: float, hoy: pd.Timestamp) -> dict
         v = c[dias == objetivo]
         vc, vp = v[v["tipo"] == "call"], v[v["tipo"] == "put"]
         if len(vc) and len(vp):
-            atm = vc.iloc[(vc["strike"] - spot).abs().argsort().iloc[0]]["impliedVolatility"]
-            otm = vp.iloc[(vp["strike"] - 0.95 * spot).abs().argsort().iloc[0]]["impliedVolatility"]
+            atm = vc.iloc[int(np.argmin((vc["strike"] - spot).abs().to_numpy()))]["impliedVolatility"]
+            otm = vp.iloc[int(np.argmin((vp["strike"] - 0.95 * spot).abs().to_numpy()))]["impliedVolatility"]
             salida.update({"dias_venc_30": float(objetivo), "iv_atm_30": float(atm),
                            "skew_95_30": float(otm - atm)})
     return salida
@@ -65,9 +67,15 @@ def snapshot(ticker: str, max_dias: int = 60, max_vencimientos: int = 10) -> dic
 
     tk = yf.Ticker(ticker)
     hist = tk.history(period="5d", auto_adjust=False)
-    if hist.empty:
-        raise RuntimeError(f"{ticker}: sin precio")
-    spot = float(hist["Close"].iloc[-1])
+    cierres = hist["Close"].dropna() if not hist.empty else pd.Series(dtype=float)
+    spot = float(cierres.iloc[-1]) if len(cierres) else float("nan")
+    if not np.isfinite(spot):
+        try:
+            spot = float(tk.fast_info["last_price"])
+        except Exception:  # noqa: BLE001
+            spot = float("nan")
+    if not np.isfinite(spot) or spot <= 0:
+        raise RuntimeError(f"{ticker}: sin precio spot válido")
     hoy = pd.Timestamp(datetime.now().date())
     partes = []
     for venc in list(tk.options)[:max_vencimientos]:

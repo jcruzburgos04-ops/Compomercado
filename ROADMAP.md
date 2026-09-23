@@ -254,7 +254,7 @@ ALERTAS NUEVAS
   · Divergencia de amplitud (1ª en 34 ruedas) · VIX sube con SPY en suba 3 días seguidos
 ```
 
-Formato elegido: **dashboard estático en GitHub Pages**, regenerado por GitHub Actions cada día hábil después del cierre de EE. UU. Es HTML con gráficos interactivos (Plotly), no necesita servidor. Las alertas (Telegram o email) quedan como opción futura.
+Formato elegido: **dashboard estático en GitHub Pages**, regenerado por GitHub Actions cada mañana hábil antes de la apertura de EE. UU. (10:30 UTC), con la rueda anterior completa Es HTML con gráficos interactivos (Plotly), no necesita servidor. Las alertas (Telegram o email) quedan como opción futura.
 
 ### 5.9 Módulo Argentina
 
@@ -370,7 +370,7 @@ Se ajustan después de la Fase 1, cuando se conozca la línea base real.
 | Sensor | AUC-PR fuera de muestra > baselines; anticipación mediana positiva ante caídas ≥ 10 %; ≤ 15–20 % del tiempo en rojo; ≤ 6–8 cambios de estado por año |
 | Overlay | Máximo drawdown −30 % o más, conservando ≥ 85–90 % de la captura alcista; Calmar mejor en todos los subperíodos |
 | Rotación | El refugio elegido le gana al mercado en ≥ 65 % de los episodios, fuera de muestra |
-| Operación | Parte diario listo < 30 min después del cierre; cero bugs de look-ahead (tests) |
+| Operación | Parte diario listo antes de la apertura de EE. UU.; cero bugs de look-ahead (tests) |
 
 ---
 
@@ -442,7 +442,7 @@ Compomercado/
 | Datos | **Solo gratuitos.** Lo que no esté disponible se construye con fórmulas propias | Catálogo de proxies propios ([catálogo §D](docs/catalogo_variables.md#d-proxies-propios-para-datos-pagos)) + **snapshots diarios** para acumular historia desde hoy (opciones, flujos de ETF) |
 | Uso diario | **Dashboard** | HTML estático con gráficos interactivos, publicado en **GitHub Pages** |
 | Validación | Sin historial de trades: **backtest del pasado + forward test** | Registro diario inmutable de señales desde el primer día; las reglas se congelan antes de evaluarlas en vivo |
-| Dónde corre | **GitHub** | GitHub Actions corre el pipeline cada día hábil después del cierre, publica el dashboard en Pages y commitea el registro forward |
+| Dónde corre | **GitHub** | GitHub Actions corre el pipeline cada mañana hábil antes de la apertura (Yahoo tarda horas en cerrar la barra diaria), publica el dashboard en Pages y commitea el registro forward |
 
 ---
 

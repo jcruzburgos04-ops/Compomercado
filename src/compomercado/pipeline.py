@@ -166,17 +166,20 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         valores["spy_cierre"] = _ultimo(precios["SPY"])
         if registro.agregar(proyecto.dir_registro, "estado_diario.csv", fecha, valores):
             log.info("Registro forward: fila %s agregada", fecha.date())
-        # Los snapshots muestran "lo de hoy": se toman con la rueda de EE. UU. ya cerrada y se
-        # fechan con el día de Nueva York, sin depender de cuándo actualiza Yahoo los precios.
-        if snapshot_opciones and rueda_cerrada:
+        # Un snapshot refleja la última rueda cerrada: la de hoy si ya pasó el cierre, o la
+        # anterior si la corrida es antes de la apertura (la corrida diaria es a la mañana).
+        # Durante la rueda las cadenas son intradía: no se registran.
+        fecha_snap = hoy_ny if rueda_cerrada else fecha
+        en_rueda = ahora_ny.weekday() < 5 and (9, 30) <= (ahora_ny.hour, ahora_ny.minute) < (16, 30)
+        if snapshot_opciones and not en_rueda:
             from .datos import opciones
 
             snap = opciones.snapshot_varios(["SPY", "QQQ", "IWM"])
             if snap:
-                registro.agregar(proyecto.dir_registro, "opciones_diario.csv", hoy_ny, snap)
+                registro.agregar(proyecto.dir_registro, "opciones_diario.csv", fecha_snap, snap)
             etfs = opciones.snapshot_etfs(ETFS_SNAPSHOT)
             if etfs:
-                registro.agregar(proyecto.dir_registro, "etfs_diario.csv", hoy_ny, etfs)
+                registro.agregar(proyecto.dir_registro, "etfs_diario.csv", fecha_snap, etfs)
 
     calidad_path = proyecto.dir_datos / "calidad_precios.csv"
     calidad = pd.read_csv(calidad_path, index_col=0) if calidad_path.exists() else pd.DataFrame()
@@ -197,9 +200,24 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         calidad=calidad,
         metadatos=S.alm.metadatos(),
         registro_estado=registro.leer(proyecto.dir_registro, "estado_diario.csv"),
-        registro_opciones=registro.leer(proyecto.dir_registro, "opciones_diario.csv"),
+        registro_opciones=_opciones_validas(registro.leer(proyecto.dir_registro, "opciones_diario.csv")),
         nombres=nombres,
     )
+
+
+def _opciones_validas(o: pd.DataFrame) -> pd.DataFrame:
+    """Descarta las métricas de un ticker en los snapshots sin precio spot válido.
+
+    El registro no se reescribe: los snapshots inválidos quedan guardados y se ignoran al leer.
+    """
+    if o.empty:
+        return o
+    o = o.copy()
+    for t in {c.split("_")[0] for c in o.columns if c.endswith("_spot")}:
+        invalido = pd.to_numeric(o[f"{t}_spot"], errors="coerce").isna()
+        cols = [c for c in o.columns if c.startswith(f"{t}_")]
+        o.loc[invalido, cols] = np.nan
+    return o
 
 
 def _ultimo(s: pd.Series) -> float:

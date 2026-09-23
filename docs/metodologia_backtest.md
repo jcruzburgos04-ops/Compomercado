@@ -147,7 +147,7 @@ El sensor tiene que demostrar que **no destruye** el rendimiento de lo que ya fu
 
 El backtest siempre tiene algo de sesgo, porque uno conoce la historia. El forward test no lo tiene.
 
-1. **Registro diario inmutable**: cada día hábil, después del cierre, GitHub Actions guarda en `registro/` los valores de todos los indicadores y del sensor tal como se veían ese día (fecha, hora UTC, versión del código). Nunca se reescribe una fila pasada.
+1. **Registro diario inmutable**: cada mañana hábil, antes de la apertura, GitHub Actions guarda (para la última rueda cerrada) en `registro/` los valores de todos los indicadores y del sensor tal como se veían ese día (fecha, hora UTC, versión del código). Nunca se reescribe una fila pasada.
 2. **Snapshot de datos**: el registro captura también las revisiones de datos (precios ajustados que cambian, series macro revisadas). Queda como una base point-in-time propia.
 3. **Reglas congeladas**: cada versión del sensor tiene un identificador. Las señales en vivo se evalúan solo contra la versión que las generó. Cambiar reglas = nueva versión y nuevo track record.
 4. **Evaluación periódica**: cada semana se completan las etiquetas cuyo horizonte ya venció (Y1…Y8). Cada trimestre se comparan las métricas en vivo con las del backtest. Si las métricas en vivo son mucho peores, es una señal de sobreajuste.

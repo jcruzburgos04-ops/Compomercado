@@ -3,7 +3,9 @@ name: Diario
 # Descarga datos, corre el análisis, guarda el registro forward y publica el dashboard en GitHub Pages.
 on:
   schedule:
-    - cron: "30 22 * * 1-5"   # 22:30 UTC, después del cierre de EE. UU. (todo el año)
+    # 10:30 UTC de martes a sábado: antes de la apertura de EE. UU., con la rueda anterior completa
+    # en Yahoo (que tarda horas en cerrar la barra diaria) y el open interest de opciones actualizado.
+    - cron: "30 10 * * 2-6"
   workflow_dispatch:
   push:
     branches: [claude/awesome-wright-d8v4po]

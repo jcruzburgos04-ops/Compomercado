@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import math
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,6 +16,8 @@ from plotly.subplots import make_subplots
 
 from ..indicadores.estado import PILARES
 from ..pipeline import Resultados
+
+log = logging.getLogger(__name__)
 
 PLOTLY_JS = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"
 
@@ -552,7 +555,7 @@ def seccion_forward(res: Resultados) -> str:
         cols = [c for c in cols if c[0] == "__indice__" or c[0] in o.columns]
         cuerpo += "<h3>Snapshots de opciones (historia propia)</h3>" + tabla(o.sort_index(ascending=False).head(30), cols)
     return f"""
-<p>Cada día hábil, después del cierre, se guarda una fila con todos los indicadores y puntajes tal como se
+<p>Cada mañana hábil, antes de la apertura, se guarda una fila de la última rueda cerrada con todos los indicadores y puntajes tal como se
 veían ese día (rama <code>registro</code> del repositorio). Nunca se reescriben filas pasadas: es el forward
 test del sensor. También se guardan snapshots de cadenas de opciones y de ETFs para construir historia
 propia de put/call, skew, GEX y flujos, que no existe gratis.</p>
@@ -783,11 +786,14 @@ def exportar_csv(res: Resultados, destino: Path) -> None:
 def construir(res: Resultados, destino: Path) -> Path:
     destino.mkdir(parents=True, exist_ok=True)
     nav, secciones = [], []
+    fallidas: list[str] = []
     for k, (id_, titulo, fn) in enumerate(SECCIONES):
         activo = " activo" if k == 0 else ""
         try:
             cuerpo = fn(res)
         except Exception as e:  # noqa: BLE001 - una sección rota no tira abajo el dashboard
+            log.exception("Sección %s del dashboard falló", id_)
+            fallidas.append(id_)
             cuerpo = f'<p class="destacado">Esta sección falló al construirse: {html.escape(str(e))}</p>'
         nav.append(f'<button class="{activo.strip()}" data-sec="{id_}">{titulo}</button>')
         secciones.append(f'<section id="{id_}" class="{activo.strip()}"><h2>{titulo}</h2>{cuerpo}</section>')

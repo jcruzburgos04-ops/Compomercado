@@ -104,3 +104,27 @@ def test_agregar_recientes_superpone_ultima_rueda(monkeypatch):
     yahoo._agregar_recientes(tablas, ["SPY"], 40, 1, 0)
     s = tablas["cierre"]["SPY"]
     assert list(s.values) == [1.0, 2.5, 3.5, 4.5]
+
+
+def test_resumir_cadena_rechaza_spot_invalido():
+    import pytest
+
+    from compomercado.datos import opciones
+
+    cadena = pd.DataFrame({"tipo": ["call", "put"], "vencimiento": ["2026-10-16"] * 2, "strike": [100.0, 95.0],
+                           "volume": [10, 20], "openInterest": [100, 300], "impliedVolatility": [0.2, 0.25]})
+    with pytest.raises(ValueError):
+        opciones.resumir_cadena(cadena, float("nan"), pd.Timestamp("2026-09-22"))
+    r = opciones.resumir_cadena(cadena, 100.0, pd.Timestamp("2026-09-22"))
+    assert r["pc_oi"] == 3.0 and abs(r["iv_atm_30"] - 0.2) < 1e-12 and abs(r["skew_95_30"] - 0.05) < 1e-12
+
+
+def test_opciones_validas_ignora_snapshots_sin_spot():
+    import numpy as np
+
+    from compomercado.pipeline import _opciones_validas
+
+    o = pd.DataFrame({"SPY_spot": [np.nan, 650.0], "SPY_iv_atm_30": [1.74, 0.15], "QQQ_spot": [580.0, 585.0],
+                      "QQQ_iv_atm_30": [0.2, 0.21]}, index=pd.to_datetime(["2026-09-22", "2026-09-23"]))
+    v = _opciones_validas(o)
+    assert np.isnan(v.loc["2026-09-22", "SPY_iv_atm_30"]) and v.loc["2026-09-22", "QQQ_iv_atm_30"] == 0.2
