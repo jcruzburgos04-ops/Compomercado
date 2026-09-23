@@ -131,23 +131,14 @@ class Proyecto:
         return list(self.universos.get("cboe", []) or [])
 
     @property
-    def argentina(self) -> dict:
-        return self.universos.get("argentina", {}) or {}
-
-    @property
     def ken_french(self) -> list[str]:
         return list(self.universos.get("ken_french", []) or [])
 
     def tickers_yahoo(self) -> list[str]:
-        """Todos los símbolos a descargar de Yahoo: universo + canastas + Argentina."""
+        """Todos los símbolos a descargar de Yahoo: universo + canastas."""
         tickers = [i.ticker for i in self.instrumentos]
         for c in self.canastas:
             tickers.extend(c.tickers)
-        arg = self.argentina
-        if arg.get("merval"):
-            tickers.append(arg["merval"])
-        for par in arg.get("ccl_pares", []) or []:
-            tickers.extend([par["adr"], par["local"]])
         vistos: dict[str, None] = {}
         for t in tickers:
             vistos.setdefault(t, None)

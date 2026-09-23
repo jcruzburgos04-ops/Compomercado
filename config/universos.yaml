@@ -72,6 +72,8 @@ factores:
   - {ticker: DVY, nombre: "Dividendos"}
   - {ticker: ARKK, nombre: "Innovación especulativa"}
 
+# Mercados globales: EE. UU. + el G7 y las mayores bolsas del mundo (China, Hong Kong, India, Taiwán,
+# Corea del Sur, Suiza, Australia). Sin mercados chicos ni regionales: no mueven la cartera.
 global_etf:
   - {ticker: EFA, nombre: "Desarrollados ex EE. UU."}
   - {ticker: EEM, nombre: "Emergentes"}
@@ -81,24 +83,16 @@ global_etf:
   - {ticker: EWU, nombre: "Reino Unido"}
   - {ticker: EWQ, nombre: "Francia"}
   - {ticker: EWI, nombre: "Italia"}
-  - {ticker: EWP, nombre: "España"}
   - {ticker: EWL, nombre: "Suiza"}
   - {ticker: EWC, nombre: "Canadá"}
   - {ticker: EWA, nombre: "Australia"}
   - {ticker: EWH, nombre: "Hong Kong"}
-  - {ticker: EWS, nombre: "Singapur"}
   - {ticker: EWY, nombre: "Corea del Sur"}
   - {ticker: EWT, nombre: "Taiwán"}
   - {ticker: FXI, nombre: "China large caps"}
   - {ticker: MCHI, nombre: "China MSCI"}
   - {ticker: KWEB, nombre: "Internet China"}
   - {ticker: INDA, nombre: "India"}
-  - {ticker: EWZ, nombre: "Brasil"}
-  - {ticker: EWW, nombre: "México"}
-  - {ticker: ECH, nombre: "Chile"}
-  - {ticker: ARGT, nombre: "Argentina"}
-  - {ticker: EZA, nombre: "Sudáfrica"}
-  - {ticker: TUR, nombre: "Turquía"}
 
 global_indices:
   - {ticker: ^N225, nombre: "Nikkei 225", zona: asia}
@@ -111,9 +105,8 @@ global_indices:
   - {ticker: ^FTSE, nombre: "FTSE 100", zona: europa}
   - {ticker: ^FCHI, nombre: "CAC 40", zona: europa}
   - {ticker: ^STOXX50E, nombre: "Euro Stoxx 50", zona: europa}
-  - {ticker: ^BVSP, nombre: "Bovespa", zona: america}
-  - {ticker: ^MXX, nombre: "IPC México", zona: america}
-  - {ticker: ^MERV, nombre: "Merval", zona: america}
+  - {ticker: ^GSPTSE, nombre: "S&P/TSX Canadá", zona: america}
+  - {ticker: ^AXJO, nombre: "S&P/ASX 200 Australia", zona: asia}
 
 renta_fija:
   - {ticker: SHY, nombre: "Tesoro 1-3 años"}
@@ -133,8 +126,6 @@ divisas:
   - {ticker: AUDJPY=X, nombre: "AUDJPY"}
   - {ticker: EURUSD=X, nombre: "EURUSD"}
   - {ticker: CNY=X, nombre: "USDCNY"}
-  - {ticker: MXN=X, nombre: "USDMXN"}
-  - {ticker: BRL=X, nombre: "USDBRL"}
   - {ticker: CEW, nombre: "Monedas emergentes (ETF)"}
 
 commodities:
@@ -176,21 +167,6 @@ fred:
 
 # Series CBOE (fuente primaria de la familia VIX; Yahoo queda como respaldo).
 cboe: [VIX, VIX9D, VIX3M, VIX6M, VVIX, SKEW, VXN, RVX, OVX, GVZ]
-
-# Módulo Argentina. CCL implícito = precio local * acciones por ADR / precio del ADR.
-argentina:
-  merval: ^MERV
-  ccl_pares:
-    - {adr: GGAL, local: GGAL.BA, ratio: 10}
-    - {adr: YPF, local: YPFD.BA, ratio: 1}
-    - {adr: PAM, local: PAMP.BA, ratio: 25}
-    - {adr: BMA, local: BMA.BA, ratio: 10}
-    - {adr: BBAR, local: BBAR.BA, ratio: 3}
-    - {adr: CEPU, local: CEPU.BA, ratio: 10}
-    - {adr: TGS, local: TGSU2.BA, ratio: 5}
-    - {adr: SUPV, local: SUPV.BA, ratio: 5}
-    - {adr: TEO, local: TECO2.BA, ratio: 5}
-    - {adr: EDN, local: EDN.BA, ratio: 20}
 
 # Historia larga sin sesgo de supervivencia.
 ken_french:

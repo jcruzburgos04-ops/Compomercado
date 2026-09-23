@@ -22,7 +22,6 @@ Secciones:
 - **Huellas y análogos**: cómo estaban los indicadores y pilares un mes y una semana antes, en el pico, en la confirmación y en el valle de cada caída; qué se repite; y qué días del pasado se parecen a hoy, con su probabilidad de caída evaluada fuera de muestra.
 - **Historia desde 1926**: 49 industrias Fama-French en cada mercado bajista.
 - **Correlaciones**: matriz actual, absorption ratio y turbulencia.
-- **Argentina**: CCL implícito, Merval en dólares, cuánto explica el mundo, ADRs frente a caídas globales.
 - **Registro forward**: señales guardadas día a día (rama `registro`), más snapshots propios de opciones.
 
 ## Uso local

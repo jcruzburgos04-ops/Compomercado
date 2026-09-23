@@ -105,9 +105,8 @@ Norgate (pago) resuelve esto si hace falta.
 | % de mercados del mundo sobre su 200 DMA | Amplitud global (≈25 ETFs país) | Derivado | 1996 | ↓ | F2 |
 | EEM/SPY, EFA/SPY | Liderazgo global vs EE. UU. | Yahoo | 2003 / 2001 | ± | F2 |
 | China: FXI, KWEB, USDCNH | Estrés chino (2015) | Yahoo | 2004 / 2013 | ↓ | F2 |
-| Monedas emergentes (CEW, BRL, MXN) | Apetito de riesgo EM | Yahoo | ≈2009 | ↓ | F2 |
+| Monedas emergentes (CEW) | Apetito de riesgo EM | Yahoo | ≈2009 | ↓ | F2 |
 | Mercados que lideran techos (Kospi y Taiwán por semis, DAX por cíclicos) | A verificar en F1 con lead-lag | Yahoo | — | ↓ | F2 |
-| Argentina: ^MERV, ARGT, ADRs (si aplica) | Riesgo local vs global | Yahoo | 1996 / 2011 | ± | F2 |
 
 ### Pilar 7: Flujo institucional y posicionamiento
 
@@ -227,29 +226,5 @@ Decisión del proyecto: **solo datos gratuitos**. Lo que no existe gratis se con
 | OAS high yield con historia larga | **Spread de crédito compuesto** | BAA10Y (FRED, 1986) + retorno relativo HYG/IEF (2007) | 1986 |
 | CNN Fear & Greed | **Miedo/codicia propio** | Los 7 componentes replicables: SPY vs media de 125, máximos-mínimos propios, McClellan propio, put/call propio, VIX vs su media de 50, SPY vs TLT a 20d, HYG vs IEF | 2007 (sin put/call, antes) |
 | Correlación implícita (CBOE) | **Correlación realizada promedio** + comparación VIX vs vol de sectores | Correlación media de pares entre sectores; ratio VIX² / Σ w² σ² sectoriales | 1998 |
-| CCL / dólar financiero argentino | **CCL implícito** | Precio local (.BA) × ratio del ADR / precio del ADR, mediana entre varias especies (GGAL, YPF, PAM, BMA…) | ≈2000s |
-| Riesgo propio de Argentina | **Residuo local** | Regresión móvil de la canasta de ADRs contra SPY, EEM y commodities; el residuo acumulado mide el riesgo "local/político" | ≈2000s |
 | Ventana de recompras | **Blackout estimado** | Fechas de resultados (Yahoo): desde ≈30 días antes hasta 2 días después; % del universo en blackout | reciente |
 | Indicadores de régimen pagos | **HMM propio** | Modelo oculto de Markov sobre retorno y volatilidad de SPY | 1928 |
-
-## E. Fuentes evaluadas
-
-### data912.com (API gratuita de mercado argentino)
-
-Probada desde GitHub Actions el 23/09/2026 (`scripts/sondear_data912.py`, workflow `sondeo.yml`). **Tiene históricos, no solo precios actuales.**
-
-| Endpoint | Qué da | Historia observada |
-|----------|--------|--------------------|
-| `/historical/stocks/{ticker}` | OHLC + volumen diario de acciones locales (GGAL, YPFD…) | desde 2001 (GGAL: 6.289 ruedas) |
-| `/historical/cedears/{ticker}` | OHLC + volumen diario de CEDEARs (SPY, AAPL…) | desde 2023 |
-| `/historical/bonds/{ticker}` | OHLC + volumen diario de bonos (AL30, GD30…) | desde 2021 |
-| `/live/arg_stocks`, `/live/arg_cedears`, `/live/arg_bonds`, `/live/usa_adrs`, `/live/usa_stocks` | Panel del día (puntas, último, volumen) | — |
-| `/live/mep`, `/live/ccl` | Dólar MEP y CCL por especie | — |
-| `/eod/volatilities/{ticker}`, `/eod/option_chain/{ticker}` | Volatilidades y cadena de opciones locales al cierre | — |
-
-Límite: 120 pedidos por minuto. **Advertencia del propio proveedor** (campo `info` de su API): "Purely for
-educational purposes API. Nothing here is real-time. Any resemblance to actual markets and real data is purely
-coincidental. I built this as a hobby". Los precios probados coinciden con el mercado, pero el proveedor no los
-garantiza y puede dar de baja el servicio. Por eso, si se integra, va como **fuente secundaria y de control**, no como
-principal: validar el CCL implícito contra `/live/ccl`, cubrir huecos de Yahoo `.BA` en acciones locales marcando el
-origen, y sumar bonos en dólares (AL30/GD30) para un riesgo país propio. Todavía no está integrada al pipeline.

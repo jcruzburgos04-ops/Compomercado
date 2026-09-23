@@ -91,13 +91,13 @@ La lista completa está en [`config/universos.yaml`](config/universos.yaml). Res
 | Sectores (SPDR) | XLK, XLF, XLV, XLE, XLI, XLY, XLP, XLU, XLB, XLRE, XLC | 1998 (XLRE 2015, XLC 2018) |
 | Industrias "canario" | SMH, IGV, XBI, KRE, ITB, XHB, XRT, IYT, XOP, XME, GDX, ITA | ≈2001–2006 |
 | Factores / estilos | MTUM, QUAL, USMV, SPLV, SPHB, VLUE, IWF, IWD | ≈2000–2013 |
-| Global | EFA, EEM, VGK, EWJ, FXI, KWEB, INDA, EWZ, EWW, EWY, EWT, ARGT + índices (^N225, ^HSI, ^GDAXI, ^STOXX50E, ^BVSP, ^MERV…) | ETF país desde 1996 |
+| Global (G7 + mayores bolsas) | EFA, EEM, VGK, EWJ, EWG, EWU, EWQ, EWI, EWC, EWL, EWA, EWH, EWY, EWT, FXI, MCHI, KWEB, INDA + índices (^N225, ^HSI, Shanghai, ^KS11, ^TWII, ^NSEI, ^GDAXI, ^FTSE, ^FCHI, ^STOXX50E, ^GSPTSE, ^AXJO) | ETF país desde 1996 |
 | Renta fija y crédito | SHY, IEF, TLT, TIP, LQD, HYG, JNK, EMB, BKLN | ≈2002–2007 |
-| Divisas | DXY, USDJPY, AUDJPY, EURUSD, USDCNH, MXN, BRL | décadas |
+| Divisas | DXY, USDJPY, AUDJPY, EURUSD, USDCNY, monedas emergentes (CEW) | décadas |
 | Materias primas | Oro, plata, cobre, WTI, gas | ≈2000 (futuros) |
 | Cripto | BTC, ETH (apetito de riesgo 24/7, señal de fin de semana) | 2014 |
 | Historia larga | 49 industrias Fama-French (diario) | **1926** |
-| **Canastas propias** | Definidas en YAML: mega caps, semis, ADRs argentinos, "mis posiciones"… | según componentes |
+| **Canastas propias** | Definidas en YAML: mega caps, semis, defensivas de calidad, "mis posiciones"… | según componentes |
 
 Las canastas propias admiten ponderación igual, por capitalización, por inversa de volatilidad o manual, y se analizan con las mismas métricas que un sector.
 
@@ -110,7 +110,7 @@ Las canastas propias admiten ponderación igual, por capitalización, por invers
 - **Proveedores** intercambiables (un módulo por fuente), con descarga incremental y reintentos.
 - **Almacén**: Parquet por serie + DuckDB para consultas. Cada registro guarda `fecha_dato`, `fecha_disponible` (cuándo se pudo conocer), `fuente` y `version`.
 - **Calidad**: huecos, splits no ajustados, saltos anómalos, precios congelados y feriados (calendarios de bolsa). También la alineación horaria de mercados globales: Asia cierra antes de la apertura de EE. UU., y Europa se superpone con ella.
-- **Proxies propios**: lo que no existe gratis se construye con fórmulas (amplitud sobre universo propio, índice tipo DIX desde FINRA, posicionamiento estimado de CTAs y fondos de volatilidad, Fear & Greed propio, CCL). Ver [catálogo §D](docs/catalogo_variables.md#d-proxies-propios-para-datos-pagos).
+- **Proxies propios**: lo que no existe gratis se construye con fórmulas (amplitud sobre universo propio, índice tipo DIX desde FINRA, posicionamiento estimado de CTAs y fondos de volatilidad, Fear & Greed propio). Ver [catálogo §D](docs/catalogo_variables.md#d-proxies-propios-para-datos-pagos).
 - **Snapshots diarios** de lo que solo existe "hoy" (cadenas de opciones, acciones en circulación de ETFs) para ir acumulando historia propia desde el primer día.
 - **Datos pagos opcionales**, descartados por ahora: Norgate (constituyentes históricos y empresas deslistadas, clave para una amplitud sin sesgo de supervivencia), opciones (CBOE DataShop / ORATS) y EOD/intradía confiable (Tiingo, EODHD, Polygon).
 
@@ -256,13 +256,14 @@ ALERTAS NUEVAS
 
 Formato elegido: **dashboard estático en GitHub Pages**, regenerado por GitHub Actions cada mañana hábil antes de la apertura de EE. UU. (10:30 UTC), con la rueda anterior completa Es HTML con gráficos interactivos (Plotly), no necesita servidor. Las alertas (Telegram o email) quedan como opción futura.
 
-### 5.9 Módulo Argentina
+### 5.9 Mercados: EE. UU. y las mayores bolsas del mundo
 
-El foco del sensor es global. Argentina se analiza **como un activo más, expuesto al estrés global**, con su propio panel:
+El sensor y el mapa miran EE. UU. y los mercados que pueden mover una cartera de acciones de EE. UU.: el G7
+(Japón, Alemania, Reino Unido, Francia, Italia, Canadá) y las mayores bolsas del resto del mundo (China, Hong Kong,
+India, Taiwán, Corea del Sur, Suiza, Australia). Los mercados chicos o regionales quedan afuera.
 
-- **Canasta de ADRs** (GGAL, YPF, PAM, BMA, VIST…): beta bajista y captura frente a SPY, EEM y VIX en cada caída global, para saber cuánto arrastra el mundo a Argentina.
-- **Merval en dólares (CCL implícito)**: se calcula con fórmula propia, sin datos pagos. CCL = precio local × ratio del ADR / precio del ADR, promediado en varias especies (p. ej. GGAL.BA vs GGAL).
-- **Riesgo propio vs riesgo global**: descomposición del retorno de la canasta en una parte explicada por el mercado global (SPY, EEM, commodities) y un residuo "local/político". Cuando el residuo domina, las señales globales pierden valor para Argentina, y el dashboard lo advierte.
+**Postergado:** el análisis del dólar en Argentina (CCL, MEP) queda para más adelante, como módulo aparte y sin
+mezclarse con el sensor.
 
 ---
 
@@ -438,7 +439,7 @@ Compomercado/
 | Tema | Decisión | Consecuencia en el diseño |
 |------|----------|---------------------------|
 | Horizonte | **Swing** (días a pocas semanas) | Objetivos principales a **5, 10 y 21 ruedas**; datos diarios al cierre (EOD); sin intradía |
-| Mercados | Se opera Argentina, pero **el foco es el mercado global** (Argentina depende mucho de la política) | El sensor mira EE. UU. + global. Argentina es un módulo aparte: ADRs, Merval en dólares CCL calculado, sensibilidad a estrés global (§5.9) |
+| Mercados | **EE. UU. y las mayores bolsas del mundo** (G7 + China, Hong Kong, India, Taiwán, Corea, Suiza, Australia). Lo que pasa en Argentina no afecta las acciones de la cartera | Sin módulo Argentina. El dólar en Argentina queda postergado (§5.9) |
 | Datos | **Solo gratuitos.** Lo que no esté disponible se construye con fórmulas propias | Catálogo de proxies propios ([catálogo §D](docs/catalogo_variables.md#d-proxies-propios-para-datos-pagos)) + **snapshots diarios** para acumular historia desde hoy (opciones, flujos de ETF) |
 | Uso diario | **Dashboard** | HTML estático con gráficos interactivos, publicado en **GitHub Pages** |
 | Validación | Sin historial de trades: **backtest del pasado + forward test** | Registro diario inmutable de señales desde el primer día; las reglas se congelan antes de evaluarlas en vivo |

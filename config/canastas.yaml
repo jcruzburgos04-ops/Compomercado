@@ -24,12 +24,6 @@ defensivas_calidad:
   rebalanceo: mensual
   componentes: [JNJ, PG, KO, PEP, WMT, COST, MCD, MRK, CL, BRK-B]
 
-argentina_adrs:
-  descripcion: "ADRs argentinos (ejemplo; confirmar si se opera este mercado)"
-  ponderacion: igual
-  rebalanceo: mensual
-  componentes: [GGAL, BMA, BBAR, SUPV, YPF, PAM, TGS, CEPU, EDN, LOMA, TEO, CRESY, IRS, VIST]
-
 mis_posiciones:
   descripcion: "Cartera actual: completar con las posiciones abiertas"
   ponderacion: manual

@@ -822,54 +822,6 @@ def seccion_correlacion(res: Resultados) -> str:
 """
 
 
-def seccion_argentina(res: Resultados) -> str:
-    a = res.argentina
-    if not a:
-        return "<p>Sin datos de Argentina.</p>"
-    series = []
-    if "ccl" in a and not a["ccl"].dropna().empty:
-        series.append(("CCL implícito (ARS por USD)", a["ccl"].dropna(), True))
-    if "merval_usd" in a:
-        series.append(("Merval en dólares CCL", a["merval_usd"].dropna(), True))
-    if "exposicion" in a:
-        series.append(("R² contra SPY, EEM y commodities (252 ruedas)", a["exposicion"]["r2_global"].dropna(), False))
-        series.append(("Residuo local acumulado 63 ruedas", a["exposicion"]["residuo_63"].dropna(), False))
-    partes = []
-    if series:
-        fig = make_subplots(rows=len(series), cols=1, shared_xaxes=True, vertical_spacing=0.06,
-                            subplot_titles=[s[0] for s in series])
-        for k, (nombre, s, log_) in enumerate(series):
-            fig.add_trace(go.Scatter(x=s.index, y=s, line=dict(color=AZUL, width=1.5), name=nombre,
-                                     hovertemplate="%{y:.2f}"), row=k + 1, col=1)
-            if log_:
-                fig.update_yaxes(type="log", row=k + 1, col=1)
-        fig = _layout(fig, 200 * len(series) + 60)
-        _selector_rango(fig)
-        partes.append(grafico(fig, "g-arg"))
-    cols = [("__indice__", "Activo", "texto"), ("nombre", "Nombre", "texto"), ("puntaje_refugio", "Refugio", "puntaje"),
-            ("beta", "Beta", "num"), ("beta_bajista", "Beta ↓", "num"), ("captura_bajista", "Captura ↓", "num"),
-            ("corr_estres", "Correl. estrés", "num"), ("n_episodios", "Episodios", "int"),
-            ("captura_mediana", "Captura mediana", "num"), ("acierto_defensivo", "Acierto", "pct0"),
-            ("rs_63_pct", "Fuerza rel. 63d", "puntaje"), ("inicio", "Desde", "fecha")]
-    for clave, titulo in (("mapa_spy", "ADRs frente a las caídas de SPY"), ("mapa_eem", "ADRs frente a las caídas de emergentes (EEM)")):
-        if clave in a:
-            t = a[clave].copy()
-            t["nombre"] = [res.nombres.get(i, i) for i in t.index]
-            partes.append(f"<h3>{titulo}</h3>{tabla(t.sort_values('beta_bajista'), cols)}")
-    ultimo = ""
-    if "exposicion" in a and not a["exposicion"]["r2_global"].dropna().empty:
-        r2 = a["exposicion"]["r2_global"].dropna().iloc[-1]
-        lectura = ("el mercado global explica buena parte del movimiento: las señales del sensor aplican"
-                   if r2 >= 0.35 else "domina el factor local/político: las señales globales pesan poco hoy")
-        ultimo = f'<p class="destacado">R² actual: <strong>{r2:.0%}</strong> — {lectura}.</p>'
-    return f"""
-<p>Argentina se mide como un activo expuesto al estrés global. El CCL se calcula con la mediana de varias
-especies (precio local × acciones por ADR / precio del ADR), descartando las que se alejan más de 15 %.
-La regresión móvil separa cuánto del movimiento de la canasta de ADRs explica el mundo y cuánto es local.</p>
-{ultimo}{"".join(partes)}
-"""
-
-
 def seccion_forward(res: Resultados) -> str:
     r = res.registro_estado
     if r.empty:
@@ -1112,7 +1064,6 @@ SECCIONES = [
     ("huellas", "Huellas y análogos", seccion_huellas),
     ("historia", "Historia desde 1926", seccion_historia),
     ("correlacion", "Correlaciones", seccion_correlacion),
-    ("argentina", "Argentina", seccion_argentina),
     ("forward", "Registro forward", seccion_forward),
     ("datos", "Datos y método", seccion_datos),
 ]

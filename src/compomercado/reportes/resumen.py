@@ -2,15 +2,10 @@
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 from ..indicadores.estado import PILARES
 from ..pipeline import Resultados
-
-
-def _pct(v: float) -> str:
-    return "—" if v is None or pd.isna(v) else f"{v * 100:+.1f}%"
 
 
 def _pct0(v) -> str:
@@ -170,18 +165,6 @@ def texto(res: Resultados) -> str:
         L.append("  Peores:           " + ", ".join(f"{i} ({v:.0f})" for i, v in tb["puntaje_refugio"].tail(6).items()))
         L.append("")
 
-    a = res.argentina
-    if a:
-        partes = []
-        if "ccl" in a and a["ccl"].notna().any():
-            partes.append(f"CCL {a['ccl'].dropna().iloc[-1]:,.0f}")
-        if "merval_usd" in a and a["merval_usd"].notna().any():
-            m = a["merval_usd"].dropna()
-            partes.append(f"Merval USD {m.iloc[-1]:,.0f} ({_pct(m.iloc[-1] / m.iloc[-22] - 1 if len(m) > 22 else np.nan)} 21d)")
-        if "exposicion" in a and a["exposicion"]["r2_global"].notna().any():
-            partes.append(f"R² global {a['exposicion']['r2_global'].dropna().iloc[-1]:.0%}")
-        L.append("ARGENTINA: " + " · ".join(partes))
-        L.append("")
 
     L.append(f"Registro forward: {len(res.registro_estado)} ruedas · opciones: {len(res.registro_opciones)} snapshots")
     return "\n".join(L)

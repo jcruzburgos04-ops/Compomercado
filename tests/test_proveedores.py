@@ -1,6 +1,6 @@
 import pandas as pd
 
-from compomercado.analitica import argentina, canastas
+from compomercado.analitica import canastas
 from compomercado.config import Canasta
 from compomercado.datos.proveedores import cboe, fred, french, yahoo
 from compomercado.indicadores import estado
@@ -50,16 +50,6 @@ def test_quitar_barra_incompleta():
     despues = datetime(2026, 9, 22, 18, 0, tzinfo=yahoo.NY)
     assert len(yahoo.quitar_barra_incompleta(df, durante)) == 1
     assert len(yahoo.quitar_barra_incompleta(df, despues)) == 2
-
-
-def test_ccl_descarta_especie_desalineada():
-    idx = pd.bdate_range("2024-01-01", periods=3)
-    locales = pd.DataFrame({"A.BA": [10000.0] * 3, "B.BA": [1000.0] * 3, "C.BA": [5000.0] * 3}, index=idx)
-    adrs = pd.DataFrame({"A": [10.0] * 3, "B": [1.0] * 3, "C": [2.0] * 3}, index=idx)
-    pares = [{"adr": "A", "local": "A.BA", "ratio": 1}, {"adr": "B", "local": "B.BA", "ratio": 1},
-             {"adr": "C", "local": "C.BA", "ratio": 1}]  # C implica 2500: ratio mal cargado
-    ccl, _ = argentina.ccl_implicito(locales, adrs, pares)
-    assert (ccl == 1000).all()
 
 
 def test_canasta_igual_peso():

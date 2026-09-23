@@ -17,7 +17,6 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
     assert "SPY" in res.mapas and len(res.mapas["SPY"].episodios) >= 1
     assert res.pilares["total"].dropna().between(0, 100).all()
     assert res.historia_larga is not None and not res.historia_larga.tabla.empty
-    assert "ccl" in res.argentina
     assert any(c.startswith("canasta:") for c in res.canastas)
     assert res.huellas is not None and len(res.huellas.tramos) >= 1
     assert res.huellas.prob.dropna().between(0, 1).all()
@@ -25,8 +24,9 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
     ruta = construir(res, p.dir_sitio)
     html = ruta.read_text(encoding="utf-8")
     for seccion in ("Estado del mercado", "Mapa de comportamiento", "Huellas y análogos", "Historia desde 1926",
-                    "Argentina", "Registro forward"):
+                    "Registro forward"):
         assert seccion in html
+    assert "Argentina" not in html and "CCL" not in html
     assert "Esta sección falló" not in html
     # Los datos del test son sintéticos: el tablero tiene que avisarlo.
     assert "DATOS DE PRUEBA" in html and "Datos reales descargados" not in html
@@ -73,7 +73,8 @@ def test_parte_diario_en_texto(tmp_path):
     p = sintetico.crear(tmp_path)
     res = analizar(p, registrar=False, snapshot_opciones=False)
     t = texto(res)
-    assert "RIESGO TOTAL" in t and "MAPA VS SPY" in t and "HISTORIA DESDE 1926" in t and "ARGENTINA" in t
+    assert "RIESGO TOTAL" in t and "MAPA VS SPY" in t and "HISTORIA DESDE 1926" in t
+    assert "ARGENTINA" not in t
     assert "HUELLAS DE LAS CAÍDAS" in t
 
 

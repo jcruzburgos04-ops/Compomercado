@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import registro
-from .analitica import argentina, canastas, huellas
+from .analitica import canastas, huellas
 from .analitica import comportamiento as comp
 from .config import Proyecto
 from .datos.series import Series
@@ -40,7 +40,7 @@ CORRELACION = ["SPY", "QQQ", "IWM", "EFA", "EEM", "XLK", "XLF", "XLV", "XLE", "X
                "XLB", "XLRE", "XLC", "SMH", "KRE", "TLT", "IEF", "HYG", "LQD", "GLD", "UUP", "DBC"]
 
 ETFS_SNAPSHOT = ["SPY", "QQQ", "IWM", "EFA", "EEM", "XLK", "XLF", "XLV", "XLE", "XLI", "XLY", "XLP", "XLU",
-                 "XLB", "XLRE", "XLC", "SMH", "KRE", "TLT", "HYG", "LQD", "GLD", "ARGT"]
+                 "XLB", "XLRE", "XLC", "SMH", "KRE", "TLT", "HYG", "LQD", "GLD"]
 
 
 @dataclass
@@ -66,7 +66,6 @@ class Resultados:
     bajo_agua: pd.DataFrame
     historia_larga: MapaRef | None
     correlacion: pd.DataFrame
-    argentina: dict
     canastas: list[str]
     calidad: pd.DataFrame
     metadatos: dict
@@ -170,8 +169,6 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
     corr_cols = [t for t in CORRELACION if t in precios.columns]
     correlacion = precios[corr_cols].pct_change().tail(63).corr()
 
-    # --- Argentina ----------------------------------------------------------------------------
-    arg = _argentina(proyecto, S, precios, mapas.get("SPY"), asinc, pre, rebotes)
 
     # --- registro forward -----------------------------------------------------------------------
     ahora_ny = datetime.now(ZoneInfo("America/New_York"))
@@ -219,7 +216,6 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         bajo_agua=bajo_agua,
         historia_larga=historia_larga,
         correlacion=correlacion,
-        argentina=arg,
         canastas=nombres_canastas,
         calidad=calidad,
         metadatos=S.alm.metadatos(),
@@ -262,37 +258,3 @@ def _opciones_validas(o: pd.DataFrame) -> pd.DataFrame:
 def _ultimo(s: pd.Series) -> float:
     s = s.dropna()
     return float(s.iloc[-1]) if len(s) else np.nan
-
-
-def _argentina(proyecto, S, precios, mapa_spy, asinc, pre, rebotes) -> dict:
-    cfg = proyecto.argentina
-    pares = cfg.get("ccl_pares", [])
-    if not pares:
-        return {}
-    locales = precios.reindex(columns=[p["local"] for p in pares])
-    adrs = precios.reindex(columns=[p["adr"] for p in pares])
-    ccl, por_especie = argentina.ccl_implicito(locales, adrs, pares)
-    salida: dict = {"ccl": ccl, "ccl_especies": por_especie}
-    merval = precios.get(cfg.get("merval", "^MERV"))
-    if merval is not None and not ccl.dropna().empty:
-        salida["merval_usd"] = (merval / ccl).rename("Merval en USD (CCL)")
-
-    col = _nombre_canasta("argentina_adrs")
-    if col in precios.columns:
-        r_arg = precios[col].pct_change()
-        factores = precios.reindex(columns=["SPY", "EEM", "DBC"]).pct_change()
-        salida["exposicion"] = argentina.exposicion_global(r_arg, factores.dropna(how="all", axis=1))
-
-    if mapa_spy is not None:
-        activos = [p["adr"] for p in pares] + [t for t in (col, "ARGT", "EWZ", "EEM") if t in precios.columns]
-        activos = [t for t in activos if t in precios.columns]
-        eps = mapa_spy.episodios
-        pm = precios["SPY"].dropna()
-        tabla_spy, _ = comp.mapa(precios[activos].loc[pm.index[0]:], pm, eps, asinc, pre=pre, rebotes=rebotes)
-        salida["mapa_spy"] = tabla_spy
-        if "EEM" in precios.columns:
-            pe = precios["EEM"].dropna()
-            eps_eem = caidas.tramos_zigzag(pe, 0.10)
-            tabla_eem, _ = comp.mapa(precios[activos].loc[pe.index[0]:], pe, eps_eem, asinc, pre=pre, rebotes=rebotes)
-            salida["mapa_eem"] = tabla_eem
-    return salida
