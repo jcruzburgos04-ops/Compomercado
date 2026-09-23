@@ -77,7 +77,7 @@ def texto(res: Resultados) -> str:
         acciones = tb[tb["grupo"].isin(["sectores", "industrias", "factores", "global_etf", "referencias", "canasta"])]
         fuera = tb[tb["grupo"].isin(["renta_fija", "commodities", "divisas", "cripto"])]
         cols = ["puntaje_refugio", "captura_mediana", "acierto_defensivo", "beta_bajista", "rs_63_pct"]
-        L.append(f"MAPA VS SPY ({len(spy.episodios)} tramos ≥10% desde {spy.episodios['pico'].min():%Y})")
+        L.append(f"MAPA VS SPY ({len(spy.episodios)} tramos ≥{res.umbral_tramos:.0%} desde {spy.episodios['pico'].min():%Y})")
         L.append("  Refugio   captura  acierto  beta↓  RS63   activo")
 
         def filas(d):

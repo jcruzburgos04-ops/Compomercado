@@ -18,7 +18,7 @@ Secciones:
 
 - **Estado del mercado**: puntaje de riesgo por pilar (preliminar) y qué pasó históricamente después de cada nivel.
 - **Mapa de comportamiento**: cada sector, industria, factor, país, activo y canasta contra SPY, QQQ, IWM, EFA y EEM. Incluye refugios con fuerza hoy y qué reducir primero.
-- **Caídas**: cada tramo ≥10 % de SPY desde 1993, con su huella macro y su tipo.
+- **Caídas**: cada tramo ≥5 % de SPY desde 1993, con su huella macro y su tipo.
 - **Historia desde 1926**: 49 industrias Fama-French en cada mercado bajista.
 - **Correlaciones**: matriz actual, absorption ratio y turbulencia.
 - **Argentina**: CCL implícito, Merval en dólares, cuánto explica el mundo, ADRs frente a caídas globales.

@@ -15,7 +15,7 @@ grupos_asincronicos: [global_indices, divisas, cripto]
 caidas:
   zigzag: [0.05, 0.10, 0.20]       # caída desde el pico y rebote del mismo tamaño
   bajo_agua: [0.10, 0.20]          # pico -> valle -> recuperación del pico
-  umbral_mapa: 0.10                # episodios usados en la tabla por episodio
+  umbral_mapa: 0.05                # tramos usados en el mapa, la huella y la tabla por episodio
   ventana_pre_pico: 63
   ventana_rebote: [21, 63]
 

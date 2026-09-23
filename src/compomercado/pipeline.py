@@ -75,6 +75,7 @@ class Resultados:
     registro_opciones: pd.DataFrame
     nombres: dict[str, str]
     ultimas_fechas: dict = field(default_factory=dict)
+    umbral_tramos: float = 0.05
 
 
 def _nombre_canasta(nombre: str) -> str:
@@ -219,6 +220,7 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         registro_opciones=_opciones_validas(registro.leer(proyecto.dir_registro, "opciones_diario.csv")),
         nombres=nombres,
         ultimas_fechas=_ultimas_fechas(S),
+        umbral_tramos=umbral,
     )
 
 

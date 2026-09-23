@@ -431,7 +431,7 @@ def seccion_mapa(res: Resultados) -> str:
         activo = " activo" if k == 0 else ""
         pestañas.append(f'<button class="subtab{activo}" data-panel="mapa-{k}">vs {ref}</button>')
         n_eps = len(m.episodios)
-        paneles.append(f'<div class="subpanel{activo}" id="mapa-{k}"><p class="pie">{n_eps} tramos de caída ≥10 % '
+        paneles.append(f'<div class="subpanel{activo}" id="mapa-{k}"><p class="pie">{n_eps} tramos de caída ≥{res.umbral_tramos:.0%} '
                        f'de {ref} desde {m.episodios["pico"].min():%Y} (zigzag).</p>{_mapa_tabla(m.tabla, res, f"t-mapa-{k}")}</div>')
 
     spy = res.mapas.get("SPY")
@@ -491,9 +491,12 @@ Son pocos episodios por tipo: leer como orientación, no como regla.</p>{tabla(p
             orden = t.loc[piv.index, "puntaje_refugio"].sort_values(ascending=False).index
             piv = piv.loc[orden]
             piv.index = [f"{i} · {res.nombres.get(i, i)}" for i in piv.index]
+            fig_hm = _heatmap(piv.clip(-0.3, 0.3), "Relativo", 0.2)
+            fig_hm.update_xaxes(tickangle=-90, tickfont=dict(size=10))
+            fig_hm.update_layout(margin=dict(l=60, r=16, t=16, b=110))
             extras += ('<h3>Retorno relativo contra SPY en cada tramo de caída</h3><p class="pie">Azul = cayó menos '
                        'que SPY; rojo = cayó más. Ordenado por puntaje de refugio.</p>'
-                       + grafico(_heatmap(piv.clip(-0.3, 0.3), "Relativo", 0.2), "g-hm-mapa"))
+                       + grafico(fig_hm, "g-hm-mapa"))
 
     return f"""
 <p>Cómo se comporta cada activo frente a cada referencia: en general (betas, captura, correlación en estrés)
@@ -509,6 +512,7 @@ Los activos que no cotizan en horario de EE. UU. se miden con retornos semanales
 
 
 def seccion_episodios(res: Resultados) -> str:
+    u = f"{res.umbral_tramos:.0%}".replace("%", " %")
     spy = res.mapas.get("SPY")
     if spy is None:
         return "<p>Sin episodios.</p>"
@@ -537,11 +541,11 @@ def seccion_episodios(res: Resultados) -> str:
                ("profundidad", "Caída", "pct"), ("dias_caida", "Ruedas de caída", "int"),
                ("dias_recuperacion", "Ruedas hasta recuperar", "int")]
     return f"""
-<p>Cada tramo de caída ≥10 % de SPY (retorno total) desde 1993, con lo que hicieron tasas, crédito, dólar,
-petróleo y yen entre el pico y el valle. Un tramo termina cuando SPY rebota ≥10 % desde el valle, así que una
+<p>Cada tramo de caída ≥{u} de SPY (retorno total) desde 1993, con lo que hicieron tasas, crédito, dólar,
+petróleo y yen entre el pico y el valle. Un tramo termina cuando SPY rebota ≥{u} desde el valle, así que una
 caída larga (2008, 2022) aparece como varias piernas.</p>
 {grafico(fig, "g-episodios")}
-<h3>Tramos de caída ≥10 % y su huella macro</h3>{tabla(eps.sort_values("pico", ascending=False), cols)}
+<h3>Tramos de caída ≥{u} y su huella macro</h3>{tabla(eps.sort_values("pico", ascending=False), cols)}
 <h3>Episodios completos (pico → valle → recuperación del pico), ≥10 %</h3>{tabla(ba.sort_values("pico", ascending=False), cols_ba)}
 """
 
