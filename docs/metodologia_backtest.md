@@ -152,6 +152,17 @@ El backtest siempre tiene algo de sesgo, porque uno conoce la historia. El forwa
 3. **Reglas congeladas**: cada versión del sensor tiene un identificador. Las señales en vivo se evalúan solo contra la versión que las generó. Cambiar reglas = nueva versión y nuevo track record.
 4. **Evaluación periódica**: cada semana se completan las etiquetas cuyo horizonte ya venció (Y1…Y8). Cada trimestre se comparan las métricas en vivo con las del backtest. Si las métricas en vivo son mucho peores, es una señal de sobreajuste.
 
+## 10. Ponderación de indicadores (implementada)
+
+Los indicadores no pesan igual: pesa más lo que más anticipó caídas. Código: `src/compomercado/indicadores/ponderacion.py`.
+
+1. **Importancia** = AUC del percentil de riesgo de cada indicador contra Y1, Y2 e Y3 (promedio). 0,5 = no informa.
+2. **Depuración** dentro de cada pilar: afuera el indicador con menos de 750 ruedas evaluables, el que no informa (AUC < 0,52), el que funciona al revés de lo esperado (AUC < 0,48; no se invierte el signo) y el que repite a otro más importante (correlación ≥ 0,85).
+3. **Pesos por ranking**: el más importante pesa n, el siguiente n−1, … el último 1, normalizados. Se eligió ranking y no el AUC crudo porque es más estable y sobreajusta menos.
+4. **Entre pilares**: se mide el AUC de cada pilar ya ponderado y se aplica el mismo ranking.
+5. **Walk-forward anual**: los pesos de cada año se estiman con datos hasta 21 ruedas antes del 1 de enero (purga igual al horizonte más largo). La serie publicada es la fuera de muestra desde 2005.
+6. **Evaluación**: la pestaña Ponderaciones compara, fuera de muestra y por período, el total ponderado contra pesos iguales y contra referencias simples (SPY bajo su media de 200, nivel del VIX).
+
 ## 9. Criterios para promover algo a "producción"
 
 Un indicador, modelo o regla pasa a producción solo si cumple todo esto:

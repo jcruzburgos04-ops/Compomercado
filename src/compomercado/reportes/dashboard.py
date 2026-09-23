@@ -183,14 +183,20 @@ def seccion_estado(res: Resultados) -> str:
     ult, previo = total.iloc[-1], total.iloc[-6] if len(total) > 5 else np.nan
     etiqueta, clase, icono = nivel(ult)
 
-    # Tabla de pilares con el indicador que más empuja.
+    pond = res.ponderacion
+    vig = pond.pesos_vigentes if pond is not None else None
+    peso_ind = vig.indicadores["peso"] if vig is not None else pd.Series(dtype=float)
+    estado_ind = vig.indicadores["estado"] if vig is not None else pd.Series(dtype=object)
+
+    # Tabla de pilares con el indicador que más empuja (entre los que cuentan para el pilar).
     ultimos = res.riesgo.ffill().iloc[-1]
     filas = []
     for pilar, nombre in PILARES.items():
         if pilar not in pil.columns:
             continue
         s = pil[pilar].dropna()
-        ids = [i for i in res.indicadores if i.pilar == pilar and i.id in ultimos.index and pd.notna(ultimos[i.id])]
+        ids = [i for i in res.indicadores if i.pilar == pilar and i.id in ultimos.index and pd.notna(ultimos[i.id])
+               and (vig is None or peso_ind.get(i.id, 0) > 0)]
         motor = max(ids, key=lambda i: ultimos[i.id], default=None)
         calma = min(ids, key=lambda i: ultimos[i.id], default=None)
         filas.append({
@@ -199,11 +205,16 @@ def seccion_estado(res: Resultados) -> str:
             "delta": s.iloc[-1] - s.iloc[-6] if len(s) > 5 else np.nan,
             "empuja": f"{motor.nombre} (p{ultimos[motor.id]:.0f})" if motor else "",
             "calma": f"{calma.nombre} (p{ultimos[calma.id]:.0f})" if calma and calma is not motor else "",
+            "peso": vig.pilares.loc[pilar, "peso"] if vig is not None and pilar in vig.pilares.index else np.nan,
+            "activos": (f"{int(vig.pilares.loc[pilar, 'incluidos'])} de {int(vig.pilares.loc[pilar, 'total'])}"
+                        if vig is not None and pilar in vig.pilares.index else ""),
         })
-    t_pilares = tabla(pd.DataFrame(filas), [
-        ("pilar", "Pilar", "texto"), ("puntaje", "Puntaje", "puntaje"), ("delta", "Δ 5 ruedas", "delta"),
-        ("empuja", "Lo que más empuja", "texto"), ("calma", "Lo que más calma", "texto"),
-    ])
+    cols_pil = [("pilar", "Pilar", "texto"), ("puntaje", "Puntaje", "puntaje"), ("delta", "Δ 5 ruedas", "delta")]
+    if vig is not None:
+        cols_pil += [("peso", "Peso en el total", "pct0", "Peso por ranking de importancia (ver Ponderaciones)"),
+                     ("activos", "Indicadores que cuentan", "texto")]
+    cols_pil += [("empuja", "Lo que más empuja", "texto"), ("calma", "Lo que más calma", "texto")]
+    t_pilares = tabla(pd.DataFrame(filas), cols_pil)
 
     # Tabla de indicadores.
     filas = []
@@ -218,6 +229,8 @@ def seccion_estado(res: Resultados) -> str:
             "riesgo": res.riesgo[ind.id].dropna().iloc[-1] if ind.id in res.riesgo and res.riesgo[ind.id].notna().any() else np.nan,
             "fecha": s.index[-1], "desc": ind.descripcion or ("Solo contexto" if not ind.en_compuesto else ""),
             "signo": {1: "↑ más = más riesgo", -1: "↓ menos = más riesgo", 0: "contexto"}[ind.signo],
+            "peso": peso_ind.get(ind.id, np.nan) if ind.en_compuesto else np.nan,
+            "estado": estado_ind.get(ind.id, "solo contexto" if not ind.en_compuesto else ""),
         })
     df_ind = pd.DataFrame(filas)
     df_ind["valor_txt"] = [fmt(v, f) for v, f in zip(df_ind["valor"], df_ind["formato"], strict=True)]
@@ -225,7 +238,9 @@ def seccion_estado(res: Resultados) -> str:
     t_ind = tabla(df_ind, [
         ("pilar", "Pilar", "texto"), ("nombre", "Indicador", "texto"), ("valor_txt", "Valor", "texto"),
         ("delta_txt", "Δ 5 ruedas", "texto"), ("riesgo", "Percentil de riesgo", "puntaje"),
-        ("signo", "Lectura", "texto"), ("fecha", "Último dato", "fecha"), ("desc", "Nota", "texto"),
+        ("signo", "Lectura", "texto"),
+    ] + ([("peso", "Peso en su pilar", "pct0"), ("estado", "Estado", "texto")] if vig is not None else []) + [
+        ("fecha", "Último dato", "fecha"), ("desc", "Nota", "texto"),
     ])
 
     # Gráfico: puntaje total y SPY (dos paneles, un eje cada uno).
@@ -264,29 +279,113 @@ def seccion_estado(res: Resultados) -> str:
     ])
 
     dias = len(total)
+    igual = res.pilares_igual["total"].dropna() if "total" in res.pilares_igual else pd.Series(dtype=float)
+    if vig is not None:
+        etiqueta_total = "Riesgo total (ponderado)"
+        comparacion = f" · con pesos iguales: {fmt(igual.iloc[-1], 'puntaje')}" if len(igual) else ""
+        como = (f"Cada indicador se compara con toda su historia previa (percentil point-in-time) y se orienta "
+                f"para que 100 = más riesgo. Dentro de cada pilar y entre pilares, <strong>pesa más lo que más "
+                f"anticipó caídas</strong>: los pesos se recalculan cada enero solo con datos anteriores (ver la "
+                f"pestaña Ponderaciones). <strong>No es una probabilidad.</strong> La tabla de abajo muestra qué "
+                f"pasó después de cada nivel desde {total.index[0]:%Y} ({dias:,} ruedas, fuera de muestra para los pesos).")
+    else:
+        etiqueta_total, comparacion = "Riesgo total (preliminar)", ""
+        como = (f"Cada indicador se compara con toda su historia previa (percentil point-in-time) y se orienta "
+                f"para que 100 = más riesgo. Cada pilar promedia sus indicadores y el total promedia los pilares. "
+                f"<strong>No es una probabilidad.</strong> La tabla de abajo muestra qué pasó después de cada "
+                f"nivel ({dias:,} ruedas; descriptivo, dentro de la muestra).")
     return f"""
 <div class="hero">
   <div class="tile">
-    <div class="tile-etq">Riesgo total (preliminar)</div>
+    <div class="tile-etq">{etiqueta_total}</div>
     <div class="tile-num">{ult:.0f}<span class="tile-de">/100</span></div>
     <div class="estado {clase}"><span aria-hidden="true">{icono}</span> {etiqueta}</div>
-    <div class="tile-sub">Hace 5 ruedas: {fmt(previo, 'puntaje')} · datos al {res.fecha:%d/%m/%Y}</div>
+    <div class="tile-sub">Hace 5 ruedas: {fmt(previo, 'puntaje')}{comparacion} · datos al {res.fecha:%d/%m/%Y}</div>
   </div>
   <div class="nota">
-    <p><strong>Cómo leerlo.</strong> Cada indicador se compara con toda su historia previa (percentil
-    point-in-time) y se orienta para que 100 = más riesgo. Cada pilar promedia sus indicadores y el total
-    promedia los pilares. <strong>No es una probabilidad</strong>: los pesos, umbrales y la selección de
-    variables se validan en la Fase 3. La tabla de abajo muestra qué pasó históricamente después de cada
-    nivel ({dias:,} ruedas; descriptivo, dentro de la muestra).</p>
+    <p><strong>Cómo leerlo.</strong> {como}</p>
   </div>
 </div>
 <h3>Pilares</h3>{t_pilares}
 <h3>Qué pasó después, según el nivel del puntaje</h3>{t_base}
 <p class="pie">Base: todas las ruedas con puntaje. Los objetivos son los de la metodología (horizonte swing).
-Resultados dentro de la muestra: sirven para leer el panel, no como validación.</p>
+Los umbrales del semáforo (40 / 60 / 75) siguen siendo provisorios.</p>
 {grafico(fig, "g-total")}
 <h3>Pilares, últimos 3 años</h3>{grafico(fig_p, "g-pilares")}
 <h3>Indicadores</h3>{t_ind}
+"""
+
+
+def seccion_ponderaciones(res: Resultados) -> str:
+    pond = res.ponderacion
+    if pond is None:
+        return "<p>Todavía no hay historia suficiente para estimar pesos.</p>"
+    vig = pond.pesos_vigentes
+    ev = pond.evaluacion.copy()
+
+    # Evaluación fuera de muestra.
+    partes_ev = []
+    for per in ev["periodo"].unique():
+        t = ev[ev["periodo"] == per].set_index("variante")
+        t["lift"] = t["tope20_y3"] / t["base_y3"]
+        cols = [("__indice__", "Variante", "texto"), ("ruedas", "Ruedas", "int"),
+                ("auc_y1", "AUC 3 % / 5 ruedas", "num", "0,5 = no anticipa; 1 = separa perfecto"),
+                ("auc_y2", "AUC 5 % / 10 ruedas", "num"), ("auc_y3", "AUC 5 % / 21 ruedas", "num"),
+                ("tope20_y3", "Caída ≥5 %/21r en el 20 % más riesgoso", "pct0"),
+                ("base_y3", "Caída ≥5 %/21r en todos los días", "pct0"),
+                ("lift", "Cuántas veces más", "x", "Frecuencia en el 20 % más riesgoso / frecuencia base")]
+        partes_ev.append(f"<h4>{html.escape(per)}</h4>{tabla(t, cols)}")
+
+    # Pilares y pesos.
+    tp = vig.pilares.copy()
+    tp.index = [PILARES.get(p, p) for p in tp.index]
+    tp["activos"] = [f"{int(a)} de {int(b)}" for a, b in zip(tp["incluidos"], tp["total"], strict=True)]
+    t_pil = tabla(tp.sort_values("peso", ascending=False), [
+        ("__indice__", "Pilar", "texto"), ("peso", "Peso en el total", "pct0"),
+        ("auc_media", "Importancia (AUC medio)", "num"), ("activos", "Indicadores que cuentan", "texto"),
+        ("estado", "Estado", "texto")])
+
+    # Indicadores por pilar.
+    nombres = {i.id: i.nombre for i in res.indicadores}
+    ti = vig.indicadores.copy()
+    ti["nombre"] = [nombres.get(i, i) for i in ti.index]
+    ti["pilar_n"] = [PILARES.get(p, p) for p in ti["pilar"]]
+    orden_pil = {p: k for k, p in enumerate(PILARES)}
+    ti["_o"] = [orden_pil.get(p, 99) for p in ti["pilar"]]
+    ti = ti.sort_values(["_o", "peso", "auc_media"], ascending=[True, False, False])
+    t_ind = tabla(ti, [
+        ("pilar_n", "Pilar", "texto"), ("nombre", "Indicador", "texto"), ("peso", "Peso en su pilar", "pct0"),
+        ("auc_media", "AUC medio", "num"), ("auc_y1", "AUC 3 %/5r", "num"), ("auc_y2", "AUC 5 %/10r", "num"),
+        ("auc_y3", "AUC 5 %/21r", "num"), ("n", "Ruedas evaluadas", "int"), ("estado", "Estado", "texto")])
+
+    # Historial de pesos por pilar (walk-forward).
+    h = pond.historial.copy()
+    h.columns = [PILARES.get(c, c) for c in h.columns]
+    h.index = [str(a) for a in h.index]
+    t_hist = tabla(h.sort_index(ascending=False), [("__indice__", "Año", "texto")] + [(c, c, "pct0") for c in h.columns])
+
+    return f"""
+<p>Los pesos salen de cuánto anticipó cada indicador las caídas de SPY en el horizonte swing (3 % en 5 ruedas,
+5 % en 10 y 5 % en 21). La medida es el AUC: 0,5 = no anticipa nada, 1 = separa perfecto los días previos a una
+caída del resto. Con eso:</p>
+<ul>
+<li><strong>Se depura:</strong> queda afuera el indicador con poca historia, el que no anticipa (AUC &lt; 0,52), el que
+funciona al revés de lo esperado (AUC &lt; 0,48; no se le da vuelta el sentido, porque sería forzar los datos) y el
+que repite a otro más importante del mismo pilar (correlación ≥ 0,85).</li>
+<li><strong>Se pondera por ranking:</strong> el más importante del pilar pesa n, el siguiente n−1, … el último 1.
+Lo mismo entre pilares.</li>
+<li><strong>Sin mirar el futuro:</strong> los pesos de cada año se calculan solo con datos hasta 21 ruedas antes del 1
+de enero. Los vigentes se estimaron con datos hasta el {vig.hasta:%d/%m/%Y}.</li>
+</ul>
+<h3>¿Ponderar mejora? Evaluación fuera de muestra</h3>
+<p class="pie">Cada variante se mide en años que no participaron del cálculo de sus pesos. Las referencias simples
+(SPY bajo su media de 200, nivel del VIX) no tienen pesos: son la vara mínima a superar.</p>
+{"".join(partes_ev)}
+<h3>Peso de cada pilar (vigente)</h3>{t_pil}
+<h3>Peso e importancia de cada indicador (vigente)</h3>{t_ind}
+<h3>Peso de cada pilar, año por año</h3>
+<p class="pie">Si los pesos saltan mucho de un año a otro, la importancia es inestable y conviene no confiar en ella.</p>
+{t_hist}
 """
 
 
@@ -540,7 +639,10 @@ def seccion_forward(res: Resultados) -> str:
     if r.empty:
         cuerpo = "<p>El registro arranca con la primera corrida diaria en GitHub Actions.</p>"
     else:
-        cols = [("__indice__", "Fecha", "fecha"), ("registrado_utc", "Registrado (UTC)", "texto"), ("pilar_total", "Total", "puntaje")]
+        cols = [("__indice__", "Fecha", "fecha"), ("registrado_utc", "Registrado (UTC)", "texto")]
+        if "pond_total" in r.columns:
+            cols.append(("pond_total", "Total ponderado", "puntaje"))
+        cols.append(("pilar_total", "Total pesos iguales", "puntaje"))
         # Las columnas de pilares se muestran solo si existen en el registro.
         cols += [(f"pilar_{p}", n, "puntaje") for p, n in PILARES.items() if f"pilar_{p}" in r.columns]
         cols += [("spy_cierre", "SPY", "num")]
@@ -644,6 +746,7 @@ section.activo { display: block; }
 .subpanel { display: none; } .subpanel.activo { display: block; }
 h2 { font-size: 18px; margin: 20px 0 8px; }
 h3 { font-size: 15px; margin: 24px 0 8px; }
+h4 { font-size: 14px; margin: 16px 0 6px; color: var(--tinta-2); }
 p { max-width: 900px; }
 .pie { color: var(--tinta-2); font-size: 13px; margin: 4px 0 8px; }
 .destacado { background: var(--superficie); border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; }
@@ -759,6 +862,7 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", tem
 
 SECCIONES = [
     ("estado", "Estado del mercado", seccion_estado),
+    ("ponderaciones", "Ponderaciones", seccion_ponderaciones),
     ("mapa", "Mapa de comportamiento", seccion_mapa),
     ("caidas", "Caídas", seccion_episodios),
     ("historia", "Historia desde 1926", seccion_historia),

@@ -16,7 +16,7 @@ from .analitica import comportamiento as comp
 from .config import Proyecto
 from .datos.series import Series
 from .eventos import caidas
-from .indicadores import estado
+from .indicadores import estado, ponderacion
 
 log = logging.getLogger(__name__)
 
@@ -58,7 +58,9 @@ class Resultados:
     precios: pd.DataFrame
     indicadores: list
     riesgo: pd.DataFrame
-    pilares: pd.DataFrame
+    pilares: pd.DataFrame            # principal: ponderados por importancia (fuera de muestra) si hay historia
+    pilares_igual: pd.DataFrame      # pesos iguales (esquema anterior, para comparar)
+    ponderacion: ponderacion.Ponderacion | None
     tabla_base: pd.DataFrame
     mapas: dict[str, MapaRef]
     bajo_agua: pd.DataFrame
@@ -147,8 +149,14 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
 
     # --- panel de estado ----------------------------------------------------------------------
     indicadores = estado.calcular(S)
-    riesgo, pilares = estado.puntajes(indicadores)
-    tabla_base = estado.tabla_base(pilares["total"], precios["SPY"]) if "total" in pilares else pd.DataFrame()
+    riesgo, pilares_igual = estado.puntajes(indicadores)
+    spy = precios["SPY"]
+    baselines = {"SPY bajo su media de 200": -(spy / spy.rolling(200).mean() - 1),
+                 "VIX": S.vol("VIX").reindex(cal)}
+    pond = ponderacion.analizar(indicadores, riesgo, pilares_igual.get("total", pd.Series(dtype=float)),
+                                spy, baselines)
+    pilares = pond.pilares if pond is not None else pilares_igual
+    tabla_base = estado.tabla_base(pilares["total"], spy) if "total" in pilares else pd.DataFrame()
 
     # --- correlaciones actuales ---------------------------------------------------------------
     corr_cols = [t for t in CORRELACION if t in precios.columns]
@@ -163,7 +171,10 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
     rueda_cerrada = ahora_ny.weekday() < 5 and (ahora_ny.hour, ahora_ny.minute) >= (16, 30)
     if registrar:
         valores = {f"ind_{i.id}": _ultimo(i.serie) for i in indicadores}
-        valores.update({f"pilar_{k}": _ultimo(pilares[k]) for k in pilares.columns})
+        # pilar_* = pesos iguales (así se registró desde el primer día); pond_* = ponderado.
+        valores.update({f"pilar_{k}": _ultimo(pilares_igual[k]) for k in pilares_igual.columns})
+        if pond is not None:
+            valores.update({f"pond_{k}": _ultimo(pond.pilares[k]) for k in pond.pilares.columns})
         valores["spy_cierre"] = _ultimo(precios["SPY"])
         if registro.agregar(proyecto.dir_registro, "estado_diario.csv", fecha, valores):
             log.info("Registro forward: fila %s agregada", fecha.date())
@@ -191,6 +202,8 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         indicadores=indicadores,
         riesgo=riesgo,
         pilares=pilares,
+        pilares_igual=pilares_igual,
+        ponderacion=pond,
         tabla_base=tabla_base,
         mapas=mapas,
         bajo_agua=bajo_agua,
