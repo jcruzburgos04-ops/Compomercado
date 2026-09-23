@@ -205,13 +205,13 @@ def seccion_estado(res: Resultados) -> str:
             "delta": s.iloc[-1] - s.iloc[-6] if len(s) > 5 else np.nan,
             "empuja": f"{motor.nombre} (p{ultimos[motor.id]:.0f})" if motor else "",
             "calma": f"{calma.nombre} (p{ultimos[calma.id]:.0f})" if calma and calma is not motor else "",
-            "peso": vig.pilares.loc[pilar, "peso"] if vig is not None and pilar in vig.pilares.index else np.nan,
+            "peso": pond.peso_pilar_total.get(pilar, 0.0) if pond is not None else np.nan,
             "activos": (f"{int(vig.pilares.loc[pilar, 'incluidos'])} de {int(vig.pilares.loc[pilar, 'total'])}"
                         if vig is not None and pilar in vig.pilares.index else ""),
         })
     cols_pil = [("pilar", "Pilar", "texto"), ("puntaje", "Puntaje", "puntaje"), ("delta", "Δ 5 ruedas", "delta")]
     if vig is not None:
-        cols_pil += [("peso", "Peso en el total", "pct0", "Peso por ranking de importancia (ver Ponderaciones)"),
+        cols_pil += [("peso", "Peso en el total", "pct0", "Los pilares pesan igual (ver Ponderaciones)"),
                      ("activos", "Indicadores que cuentan", "texto")]
     cols_pil += [("empuja", "Lo que más empuja", "texto"), ("calma", "Lo que más calma", "texto")]
     t_pilares = tabla(pd.DataFrame(filas), cols_pil)
@@ -284,9 +284,10 @@ def seccion_estado(res: Resultados) -> str:
         etiqueta_total = "Riesgo total (ponderado)"
         comparacion = f" · con pesos iguales: {fmt(igual.iloc[-1], 'puntaje')}" if len(igual) else ""
         como = (f"Cada indicador se compara con toda su historia previa (percentil point-in-time) y se orienta "
-                f"para que 100 = más riesgo. Dentro de cada pilar y entre pilares, <strong>pesa más lo que más "
-                f"anticipó caídas</strong>: los pesos se recalculan cada enero solo con datos anteriores (ver la "
-                f"pestaña Ponderaciones). <strong>No es una probabilidad.</strong> La tabla de abajo muestra qué "
+                f"para que 100 = más riesgo. Dentro de cada pilar <strong>pesa más el indicador que más anticipó "
+                f"caídas</strong>, y los pilares pesan igual en el total. Los pesos se recalculan cada enero solo "
+                f"con datos anteriores (ver la pestaña Ponderaciones). <strong>No es una probabilidad.</strong> "
+                f"La tabla de abajo muestra qué "
                 f"pasó después de cada nivel desde {total.index[0]:%Y} ({dias:,} ruedas, fuera de muestra para los pesos).")
     else:
         etiqueta_total, comparacion = "Riesgo total (preliminar)", ""
@@ -338,12 +339,15 @@ def seccion_ponderaciones(res: Resultados) -> str:
 
     # Pilares y pesos.
     tp = vig.pilares.copy()
+    tp["peso_total"] = [pond.peso_pilar_total.get(p, 0.0) for p in tp.index]
+    tp["peso_ranking"] = tp["peso"]
     tp.index = [PILARES.get(p, p) for p in tp.index]
     tp["activos"] = [f"{int(a)} de {int(b)}" for a, b in zip(tp["incluidos"], tp["total"], strict=True)]
-    t_pil = tabla(tp.sort_values("peso", ascending=False), [
-        ("__indice__", "Pilar", "texto"), ("peso", "Peso en el total", "pct0"),
-        ("auc_media", "Importancia (AUC medio)", "num"), ("activos", "Indicadores que cuentan", "texto"),
-        ("estado", "Estado", "texto")])
+    t_pil = tabla(tp.sort_values("auc_media", ascending=False), [
+        ("__indice__", "Pilar", "texto"), ("auc_media", "Importancia (AUC medio)", "num"),
+        ("peso_total", "Peso en el total", "pct0"),
+        ("peso_ranking", "Peso si se ponderara por ranking", "pct0", "Variante evaluada y descartada"),
+        ("activos", "Indicadores que cuentan", "texto"), ("estado", "Estado", "texto")])
 
     # Indicadores por pilar.
     nombres = {i.id: i.nombre for i in res.indicadores}
@@ -358,11 +362,11 @@ def seccion_ponderaciones(res: Resultados) -> str:
         ("auc_media", "AUC medio", "num"), ("auc_y1", "AUC 3 %/5r", "num"), ("auc_y2", "AUC 5 %/10r", "num"),
         ("auc_y3", "AUC 5 %/21r", "num"), ("n", "Ruedas evaluadas", "int"), ("estado", "Estado", "texto")])
 
-    # Historial de pesos por pilar (walk-forward).
+    # Historial de importancia por pilar (walk-forward).
     h = pond.historial.copy()
     h.columns = [PILARES.get(c, c) for c in h.columns]
     h.index = [str(a) for a in h.index]
-    t_hist = tabla(h.sort_index(ascending=False), [("__indice__", "Año", "texto")] + [(c, c, "pct0") for c in h.columns])
+    t_hist = tabla(h.sort_index(ascending=False), [("__indice__", "Año", "texto")] + [(c, c, "num") for c in h.columns])
 
     return f"""
 <p>Los pesos salen de cuánto anticipó cada indicador las caídas de SPY en el horizonte swing (3 % en 5 ruedas,
@@ -372,8 +376,9 @@ caída del resto. Con eso:</p>
 <li><strong>Se depura:</strong> queda afuera el indicador con poca historia, el que no anticipa (AUC &lt; 0,52), el que
 funciona al revés de lo esperado (AUC &lt; 0,48; no se le da vuelta el sentido, porque sería forzar los datos) y el
 que repite a otro más importante del mismo pilar (correlación ≥ 0,85).</li>
-<li><strong>Se pondera por ranking:</strong> el más importante del pilar pesa n, el siguiente n−1, … el último 1.
-Lo mismo entre pilares.</li>
+<li><strong>Se pondera por ranking dentro de cada pilar:</strong> el más importante pesa n, el siguiente n−1, … el
+último 1. <strong>Los pilares pesan igual</strong> en el total: ponderarlos por ranking también se evalúa abajo, pero
+empeoró 2015–2019 fuera de muestra y no mejoró el resto.</li>
 <li><strong>Sin mirar el futuro:</strong> los pesos de cada año se calculan solo con datos hasta 21 ruedas antes del 1
 de enero. Los vigentes se estimaron con datos hasta el {vig.hasta:%d/%m/%Y}.</li>
 </ul>
@@ -381,10 +386,11 @@ de enero. Los vigentes se estimaron con datos hasta el {vig.hasta:%d/%m/%Y}.</li
 <p class="pie">Cada variante se mide en años que no participaron del cálculo de sus pesos. Las referencias simples
 (SPY bajo su media de 200, nivel del VIX) no tienen pesos: son la vara mínima a superar.</p>
 {"".join(partes_ev)}
-<h3>Peso de cada pilar (vigente)</h3>{t_pil}
+<h3>Importancia y peso de cada pilar (vigente)</h3>{t_pil}
 <h3>Peso e importancia de cada indicador (vigente)</h3>{t_ind}
-<h3>Peso de cada pilar, año por año</h3>
-<p class="pie">Si los pesos saltan mucho de un año a otro, la importancia es inestable y conviene no confiar en ella.</p>
+<h3>Importancia de cada pilar, año por año (AUC medio)</h3>
+<p class="pie">Cómo se veía la importancia de cada pilar con los datos disponibles cada enero. Si cambia mucho de un año
+a otro, conviene no confiar en rankings finos.</p>
 {t_hist}
 """
 
@@ -680,8 +686,10 @@ def seccion_datos(res: Resultados) -> str:
         if len(malos):
             avisos += tabla(malos, [("__indice__", "Ticker", "texto"), ("inicio", "Inicio", "texto"), ("fin", "Fin", "texto"),
                                     ("estado", "Aviso", "texto")])
+    ult = "".join(f"<li>{html.escape(k)}: {v:%d/%m/%Y}</li>" for k, v in (res.ultimas_fechas or {}).items())
+    ult = f"<h3>Último dato por fuente</h3><ul>{ult}</ul>" if ult else ""
     return f"""
-<h3>Fuentes</h3>{meta}
+<h3>Fuentes</h3>{meta}{ult}
 <h3>Calidad de precios</h3>{avisos}
 <h3>Descargas</h3>
 <ul>

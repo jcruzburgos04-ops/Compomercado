@@ -85,7 +85,7 @@ def test_pesos_no_miran_el_futuro():
 
 def test_walk_forward_genera_serie_fuera_de_muestra():
     inds, R, Y = _escenario()
-    pil, dentro, vigentes, historial = pond.walk_forward(inds, R, Y, primer_anio=2004)
+    pil, entre, vigentes, historial = pond.walk_forward(inds, R, Y, primer_anio=2004)
     assert vigentes is not None and not pil.empty
     # Los pesos de cada año se estiman antes de que empiece ese año.
     assert vigentes.hasta < pd.Timestamp(f"{pil.index.max().year}-01-01")

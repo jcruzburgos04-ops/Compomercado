@@ -11,7 +11,8 @@ Método (pensado para no engañarse con el backtest):
    contrario a la teoría es sospechoso) y el redundante (correlación ≥ 0,85 con otro más importante
    del mismo pilar).
 4. **Pesos por ranking**: dentro de cada pilar, el más importante pesa n, el segundo n−1, … el
-   último 1 (normalizados). Entre pilares se hace lo mismo con la importancia de cada pilar.
+   último 1 (normalizados). Los pilares pesan igual en el total: ponderarlos por ranking también se
+   evalúa, pero con datos reales empeoró 2015–2019 fuera de muestra y no mejoró el resto.
 5. **Walk-forward**: los pesos de cada año se calculan solo con datos hasta 21 ruedas antes del 1
    de enero (purga: el objetivo mira 21 ruedas hacia adelante). Así la serie ponderada es fuera de
    muestra y se puede comparar honestamente contra pesos iguales.
@@ -231,17 +232,18 @@ def compuesto(riesgo: pd.DataFrame, pesos: Pesos, entre_pilares: bool = True) ->
 
 @dataclass
 class Ponderacion:
-    pilares: pd.DataFrame           # pilares ponderados + total, fuera de muestra (principal)
-    total_dentro: pd.Series         # ponderado solo dentro de los pilares (pilares iguales)
+    pilares: pd.DataFrame           # principal: pilares ponderados por dentro + total con pilares iguales
+    total_entre: pd.Series          # alternativa evaluada: también ponderado entre pilares
     pesos_vigentes: Pesos           # los que se usan este año
-    historial: pd.DataFrame         # año x pilar: peso del pilar
+    peso_pilar_total: pd.Series     # peso efectivo de cada pilar en el total (iguales)
+    historial: pd.DataFrame         # año x pilar: importancia (AUC) estimada ese año
     evaluacion: pd.DataFrame        # variante x período: métricas fuera de muestra
     inicio_oos: pd.Timestamp | None
 
 
 def walk_forward(indicadores: list[Indicador], riesgo: pd.DataFrame, Y: pd.DataFrame, primer_anio: int = 2005):
     fechas = riesgo.index
-    partes, partes_dentro, historial = [], [], {}
+    partes, partes_entre, historial = [], [], {}
     vigentes = None
     for anio in range(primer_anio, fechas.max().year + 1):
         prueba = fechas[fechas.year == anio]
@@ -254,15 +256,15 @@ def walk_forward(indicadores: list[Indicador], riesgo: pd.DataFrame, Y: pd.DataF
         if len(pesos.peso_pilar) < 2:
             continue
         # Se calcula sobre toda la historia hasta fin de año: los percentiles ya son point-in-time.
-        comp = compuesto(riesgo.loc[: prueba[-1]], pesos)
-        dentro = compuesto(riesgo.loc[: prueba[-1]], pesos, entre_pilares=False)["total"]
-        partes.append(comp.loc[prueba])
-        partes_dentro.append(dentro.loc[prueba])
-        historial[anio] = pesos.pilares["peso"]
+        dentro = compuesto(riesgo.loc[: prueba[-1]], pesos, entre_pilares=False)
+        entre = compuesto(riesgo.loc[: prueba[-1]], pesos, entre_pilares=True)["total"]
+        partes.append(dentro.loc[prueba])
+        partes_entre.append(entre.loc[prueba])
+        historial[anio] = pesos.pilares["auc_media"]
         vigentes = pesos
     if not partes:
         return pd.DataFrame(), pd.Series(dtype=float), None, pd.DataFrame()
-    return (pd.concat(partes).sort_index(), pd.concat(partes_dentro).sort_index(), vigentes,
+    return (pd.concat(partes).sort_index(), pd.concat(partes_entre).sort_index(), vigentes,
             pd.DataFrame(historial).T.sort_index())
 
 
@@ -287,7 +289,7 @@ def evaluar(variantes: dict[str, pd.Series], Y: pd.DataFrame, periodos: dict[str
 def analizar(indicadores: list[Indicador], riesgo: pd.DataFrame, total_igual: pd.Series,
              spy: pd.Series, baselines: dict[str, pd.Series], primer_anio: int = 2005) -> Ponderacion | None:
     Y = objetivos(spy.reindex(riesgo.index))
-    pil, dentro, vigentes, historial = walk_forward(indicadores, riesgo, Y, primer_anio)
+    pil, entre, vigentes, historial = walk_forward(indicadores, riesgo, Y, primer_anio)
     if vigentes is None or pil.empty:
         log.warning("Ponderación: no hay historia suficiente para estimar pesos")
         return None
@@ -295,10 +297,12 @@ def analizar(indicadores: list[Indicador], riesgo: pd.DataFrame, total_igual: pd
     fin = pil.index.max()
     periodos = {"Todo el período": (inicio, fin), "2005–2014": (inicio, "2014-12-31"),
                 "2015–2019": ("2015-01-01", "2019-12-31"), "2020 en adelante": ("2020-01-01", fin)}
-    variantes = {"Ponderado (dentro y entre pilares)": pil["total"], "Ponderado solo dentro de pilares": dentro,
-                 "Pesos iguales (anterior)": total_igual}
+    variantes = {"Ponderado dentro de pilares (principal)": pil["total"],
+                 "Ponderado dentro y entre pilares": entre, "Pesos iguales (anterior)": total_igual}
     variantes.update(baselines)
     ev = evaluar(variantes, Y, periodos)
     log.info("Ponderación: pesos vigentes estimados hasta %s", vigentes.hasta)
-    return Ponderacion(pilares=pil, total_dentro=dentro, pesos_vigentes=vigentes, historial=historial,
-                       evaluacion=ev, inicio_oos=inicio)
+    activos = [p for p in pil.columns if p != "total"]
+    peso_total = pd.Series(1 / len(activos), index=activos) if activos else pd.Series(dtype=float)
+    return Ponderacion(pilares=pil, total_entre=entre, pesos_vigentes=vigentes, peso_pilar_total=peso_total,
+                       historial=historial, evaluacion=ev, inicio_oos=inicio)

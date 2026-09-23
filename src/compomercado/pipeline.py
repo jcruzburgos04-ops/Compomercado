@@ -74,6 +74,7 @@ class Resultados:
     registro_estado: pd.DataFrame
     registro_opciones: pd.DataFrame
     nombres: dict[str, str]
+    ultimas_fechas: dict = field(default_factory=dict)
 
 
 def _nombre_canasta(nombre: str) -> str:
@@ -217,7 +218,19 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         registro_estado=registro.leer(proyecto.dir_registro, "estado_diario.csv"),
         registro_opciones=_opciones_validas(registro.leer(proyecto.dir_registro, "opciones_diario.csv")),
         nombres=nombres,
+        ultimas_fechas=_ultimas_fechas(S),
     )
+
+
+def _ultimas_fechas(S: Series) -> dict:
+    """Último dato disponible de cada fuente, para detectar demoras (p. ej. Yahoo sin la última rueda)."""
+    salida = {}
+    for etiqueta, serie in (("SPY (Yahoo)", S.precio("SPY")), ("VIX (CBOE)", S._tabla("cboe").get("VIX")),
+                            ("Nikkei (Yahoo)", S.precio("^N225")),
+                            ("Tasa 10a (FRED)", S._tabla("fred").get("DGS10"))):
+        if serie is not None and serie.notna().any():
+            salida[etiqueta] = serie.last_valid_index()
+    return salida
 
 
 def _opciones_validas(o: pd.DataFrame) -> pd.DataFrame:

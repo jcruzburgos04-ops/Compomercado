@@ -20,6 +20,8 @@ def texto(res: Resultados) -> str:
         L.append(f"Origen: descarga real de {', '.join(o['fuentes'])} ({str(o.get('descargado_utc'))[:16]} UTC)")
     else:
         L.append("ATENCIÓN: DATOS DE PRUEBA, no reflejan el mercado")
+    if res.ultimas_fechas:
+        L.append("Último dato: " + " · ".join(f"{k} {v:%d/%m}" for k, v in res.ultimas_fechas.items()))
     L.append("")
     pil = res.pilares
     pond = res.ponderacion
@@ -34,7 +36,7 @@ def texto(res: Resultados) -> str:
         for p, nombre in PILARES.items():
             if p in pil and pil[p].notna().any():
                 s = pil[p].dropna()
-                peso = f"  peso {vig.pilares.loc[p, 'peso']:.0%}" if vig is not None and p in vig.pilares.index else ""
+                peso = f"  peso {pond.peso_pilar_total.get(p, 0):.0%}" if pond is not None else ""
                 L.append(f"  {nombre:<28}{s.iloc[-1]:5.0f}{peso}")
         ult = res.riesgo.ffill().iloc[-1].dropna().sort_values()
         if vig is not None:
@@ -52,7 +54,7 @@ def texto(res: Resultados) -> str:
             if p not in vig.pilares.index:
                 continue
             fp = vig.pilares.loc[p]
-            L.append(f"  {nombre} — peso {fp['peso']:.0%}, AUC {fp['auc_media']:.3f}, {fp['estado']}")
+            L.append(f"  {nombre} — peso {pond.peso_pilar_total.get(p, 0):.0%}, AUC {fp['auc_media']:.3f}, {fp['estado']}")
             sub = ti[ti["pilar"] == p].sort_values(["peso", "auc_media"], ascending=False)
             for i, f in sub.iterrows():
                 marca = f"{f['peso']:4.0%}" if f["peso"] > 0 else "  — "
