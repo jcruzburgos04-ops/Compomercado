@@ -1,0 +1,41 @@
+# Canastas propias (BORRADOR). Cada canasta se analiza igual que un sector:
+# comportamiento en cada caída, beta bajista, captura, correlación en estrés,
+# correlación interna y diversificación efectiva.
+#
+# ponderacion: igual | capitalizacion | inversa_volatilidad | manual
+# rebalanceo:  diario | mensual | trimestral
+# Con ponderacion "manual", cada componente lleva su peso: {ticker: X, peso: 0.25}
+
+mega_caps:
+  descripcion: "Mega caps de EE. UU."
+  ponderacion: capitalizacion
+  rebalanceo: mensual
+  componentes: [AAPL, MSFT, NVDA, AMZN, GOOGL, META, AVGO, TSLA, BRK-B, LLY, JPM]
+
+semis:
+  descripcion: "Semiconductores (líderes históricos de techos y pisos, a verificar)"
+  ponderacion: igual
+  rebalanceo: mensual
+  componentes: [NVDA, AMD, AVGO, TSM, ASML, MU, QCOM, TXN, AMAT, LRCX, KLAC, INTC, MRVL]
+
+defensivas_calidad:
+  descripcion: "Defensivas de calidad: candidatas a refugio"
+  ponderacion: inversa_volatilidad
+  rebalanceo: mensual
+  componentes: [JNJ, PG, KO, PEP, WMT, COST, MCD, MRK, CL, BRK-B]
+
+argentina_adrs:
+  descripcion: "ADRs argentinos (ejemplo; confirmar si se opera este mercado)"
+  ponderacion: igual
+  rebalanceo: mensual
+  componentes: [GGAL, BMA, BBAR, SUPV, YPF, PAM, TGS, CEPU, EDN, LOMA, TEO, CRESY, IRS, VIST]
+
+mis_posiciones:
+  descripcion: "Cartera actual: completar con las posiciones abiertas"
+  ponderacion: manual
+  rebalanceo: diario
+  componentes: []
+  # ejemplo:
+  # componentes:
+  #   - {ticker: MSFT, peso: 0.20}
+  #   - {ticker: XLE,  peso: 0.15}

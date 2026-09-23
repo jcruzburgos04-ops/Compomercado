@@ -1,0 +1,180 @@
+# Universo por defecto de Compomercado (BORRADOR — se valida en la Fase 0).
+# Símbolos en formato Yahoo Finance. Para la familia VIX la fuente primaria es CBOE
+# y los símbolos Yahoo quedan como respaldo.
+
+referencias:
+  - {ticker: SPY, nombre: "S&P 500"}
+  - {ticker: QQQ, nombre: "Nasdaq 100"}
+  - {ticker: IWM, nombre: "Russell 2000"}
+  - {ticker: DIA, nombre: "Dow Jones"}
+  - {ticker: RSP, nombre: "S&P 500 igual ponderación"}
+  - {ticker: MDY, nombre: "S&P 400 Mid Cap"}
+  - {ticker: ^GSPC, nombre: "S&P 500 índice (historia desde 1928)"}
+  - {ticker: ^NDX, nombre: "Nasdaq 100 índice"}
+  - {ticker: ^RUT, nombre: "Russell 2000 índice"}
+
+volatilidad:
+  - {ticker: ^VIX, nombre: "VIX"}
+  - {ticker: ^VIX9D, nombre: "VIX 9 días"}
+  - {ticker: ^VIX3M, nombre: "VIX 3 meses"}
+  - {ticker: ^VIX6M, nombre: "VIX 6 meses"}
+  - {ticker: ^VVIX, nombre: "Volatilidad del VIX"}
+  - {ticker: ^SKEW, nombre: "CBOE SKEW"}
+  - {ticker: ^MOVE, nombre: "Volatilidad de bonos del Tesoro"}
+  - {ticker: ^VXN, nombre: "Volatilidad Nasdaq 100"}
+  - {ticker: ^RVX, nombre: "Volatilidad Russell 2000"}
+  - {ticker: ^OVX, nombre: "Volatilidad del petróleo"}
+  - {ticker: ^GVZ, nombre: "Volatilidad del oro"}
+
+sectores:
+  - {ticker: XLK, nombre: "Tecnología"}
+  - {ticker: XLF, nombre: "Financiero"}
+  - {ticker: XLV, nombre: "Salud"}
+  - {ticker: XLE, nombre: "Energía"}
+  - {ticker: XLI, nombre: "Industriales"}
+  - {ticker: XLY, nombre: "Consumo discrecional"}
+  - {ticker: XLP, nombre: "Consumo básico"}
+  - {ticker: XLU, nombre: "Utilities"}
+  - {ticker: XLB, nombre: "Materiales"}
+  - {ticker: XLRE, nombre: "Real estate (desde 2015)"}
+  - {ticker: XLC, nombre: "Comunicaciones (desde 2018)"}
+
+industrias:
+  - {ticker: SMH, nombre: "Semiconductores"}
+  - {ticker: SOXX, nombre: "Semiconductores (iShares)"}
+  - {ticker: IGV, nombre: "Software"}
+  - {ticker: XBI, nombre: "Biotecnología (igual peso)"}
+  - {ticker: IBB, nombre: "Biotecnología"}
+  - {ticker: KRE, nombre: "Bancos regionales"}
+  - {ticker: KBE, nombre: "Bancos"}
+  - {ticker: KIE, nombre: "Seguros"}
+  - {ticker: ITB, nombre: "Constructoras de viviendas"}
+  - {ticker: XHB, nombre: "Construcción residencial"}
+  - {ticker: XRT, nombre: "Retail"}
+  - {ticker: IYT, nombre: "Transporte"}
+  - {ticker: JETS, nombre: "Aerolíneas (desde 2015)"}
+  - {ticker: XOP, nombre: "Exploración y producción de petróleo"}
+  - {ticker: OIH, nombre: "Servicios petroleros"}
+  - {ticker: XME, nombre: "Metales y minería"}
+  - {ticker: GDX, nombre: "Mineras de oro"}
+  - {ticker: ITA, nombre: "Aeroespacial y defensa"}
+  - {ticker: IHI, nombre: "Dispositivos médicos"}
+  - {ticker: TAN, nombre: "Solar"}
+
+factores:
+  - {ticker: MTUM, nombre: "Momentum"}
+  - {ticker: QUAL, nombre: "Calidad"}
+  - {ticker: USMV, nombre: "Mínima volatilidad"}
+  - {ticker: SPLV, nombre: "Baja volatilidad S&P 500"}
+  - {ticker: SPHB, nombre: "Alta beta S&P 500"}
+  - {ticker: VLUE, nombre: "Value"}
+  - {ticker: IWF, nombre: "Russell 1000 Growth"}
+  - {ticker: IWD, nombre: "Russell 1000 Value"}
+  - {ticker: DVY, nombre: "Dividendos"}
+  - {ticker: ARKK, nombre: "Innovación especulativa"}
+
+global_etf:
+  - {ticker: EFA, nombre: "Desarrollados ex EE. UU."}
+  - {ticker: EEM, nombre: "Emergentes"}
+  - {ticker: VGK, nombre: "Europa"}
+  - {ticker: EWJ, nombre: "Japón"}
+  - {ticker: EWG, nombre: "Alemania"}
+  - {ticker: EWU, nombre: "Reino Unido"}
+  - {ticker: EWQ, nombre: "Francia"}
+  - {ticker: EWI, nombre: "Italia"}
+  - {ticker: EWP, nombre: "España"}
+  - {ticker: EWL, nombre: "Suiza"}
+  - {ticker: EWC, nombre: "Canadá"}
+  - {ticker: EWA, nombre: "Australia"}
+  - {ticker: EWH, nombre: "Hong Kong"}
+  - {ticker: EWS, nombre: "Singapur"}
+  - {ticker: EWY, nombre: "Corea del Sur"}
+  - {ticker: EWT, nombre: "Taiwán"}
+  - {ticker: FXI, nombre: "China large caps"}
+  - {ticker: MCHI, nombre: "China MSCI"}
+  - {ticker: KWEB, nombre: "Internet China"}
+  - {ticker: INDA, nombre: "India"}
+  - {ticker: EWZ, nombre: "Brasil"}
+  - {ticker: EWW, nombre: "México"}
+  - {ticker: ECH, nombre: "Chile"}
+  - {ticker: ARGT, nombre: "Argentina"}
+  - {ticker: EZA, nombre: "Sudáfrica"}
+  - {ticker: TUR, nombre: "Turquía"}
+
+global_indices:
+  - {ticker: ^N225, nombre: "Nikkei 225", zona: asia}
+  - {ticker: ^HSI, nombre: "Hang Seng", zona: asia}
+  - {ticker: 000001.SS, nombre: "Shanghai Composite", zona: asia}
+  - {ticker: ^KS11, nombre: "KOSPI", zona: asia}
+  - {ticker: ^TWII, nombre: "Taiwán", zona: asia}
+  - {ticker: ^NSEI, nombre: "Nifty 50", zona: asia}
+  - {ticker: ^GDAXI, nombre: "DAX", zona: europa}
+  - {ticker: ^FTSE, nombre: "FTSE 100", zona: europa}
+  - {ticker: ^FCHI, nombre: "CAC 40", zona: europa}
+  - {ticker: ^STOXX50E, nombre: "Euro Stoxx 50", zona: europa}
+  - {ticker: ^BVSP, nombre: "Bovespa", zona: america}
+  - {ticker: ^MXX, nombre: "IPC México", zona: america}
+  - {ticker: ^MERV, nombre: "Merval", zona: america}
+
+renta_fija:
+  - {ticker: SHY, nombre: "Tesoro 1-3 años"}
+  - {ticker: IEF, nombre: "Tesoro 7-10 años"}
+  - {ticker: TLT, nombre: "Tesoro 20+ años"}
+  - {ticker: TIP, nombre: "Bonos indexados a inflación"}
+  - {ticker: LQD, nombre: "Corporativos grado de inversión"}
+  - {ticker: HYG, nombre: "High yield"}
+  - {ticker: JNK, nombre: "High yield (SPDR)"}
+  - {ticker: EMB, nombre: "Deuda emergente en USD"}
+  - {ticker: BKLN, nombre: "Préstamos apalancados"}
+
+divisas:
+  - {ticker: DX-Y.NYB, nombre: "Índice dólar (DXY)"}
+  - {ticker: UUP, nombre: "Dólar (ETF)"}
+  - {ticker: JPY=X, nombre: "USDJPY"}
+  - {ticker: AUDJPY=X, nombre: "AUDJPY"}
+  - {ticker: EURUSD=X, nombre: "EURUSD"}
+  - {ticker: CNH=X, nombre: "USDCNH"}
+  - {ticker: MXN=X, nombre: "USDMXN"}
+  - {ticker: BRL=X, nombre: "USDBRL"}
+  - {ticker: CEW, nombre: "Monedas emergentes (ETF)"}
+
+commodities:
+  - {ticker: GC=F, nombre: "Oro (futuro)"}
+  - {ticker: SI=F, nombre: "Plata (futuro)"}
+  - {ticker: HG=F, nombre: "Cobre (futuro)"}
+  - {ticker: CL=F, nombre: "WTI (futuro)"}
+  - {ticker: NG=F, nombre: "Gas natural (futuro)"}
+  - {ticker: GLD, nombre: "Oro (ETF)"}
+  - {ticker: DBC, nombre: "Canasta de commodities"}
+
+cripto:
+  - {ticker: BTC-USD, nombre: "Bitcoin"}
+  - {ticker: ETH-USD, nombre: "Ethereum"}
+
+# Series macro y de estrés (FRED). Detalle y uso en docs/catalogo_variables.md.
+fred:
+  - BAA10Y          # spread Baa - Tesoro 10a
+  - BAMLH0A0HYM2    # OAS high yield (historial recortado en FRED: verificar)
+  - BAMLC0A0CM      # OAS grado de inversión (idem)
+  - T10Y2Y
+  - T10Y3M
+  - DGS10
+  - DFII10
+  - T10YIE
+  - STLFSI4         # St. Louis Fed Financial Stress Index (semanal)
+  - NFCI            # Chicago Fed (semanal)
+  - ANFCI
+  - WALCL           # balance de la Fed
+  - WTREGEN         # cuenta del Tesoro (TGA)
+  - RRPONTSYD       # repos reversos
+  - ICSA            # pedidos iniciales de desempleo
+  - SAHMREALTIME
+  - DCOILWTICO
+  - DEXJPUS
+  - USREC           # recesiones NBER (solo etiqueta, no predictor)
+
+# Historia larga sin sesgo de supervivencia.
+ken_french:
+  - 49_Industry_Portfolios_daily
+  - 12_Industry_Portfolios_daily
+  - F-F_Research_Data_Factors_daily
