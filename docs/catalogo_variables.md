@@ -231,3 +231,25 @@ Decisión del proyecto: **solo datos gratuitos**. Lo que no existe gratis se con
 | Riesgo propio de Argentina | **Residuo local** | Regresión móvil de la canasta de ADRs contra SPY, EEM y commodities; el residuo acumulado mide el riesgo "local/político" | ≈2000s |
 | Ventana de recompras | **Blackout estimado** | Fechas de resultados (Yahoo): desde ≈30 días antes hasta 2 días después; % del universo en blackout | reciente |
 | Indicadores de régimen pagos | **HMM propio** | Modelo oculto de Markov sobre retorno y volatilidad de SPY | 1928 |
+
+## E. Fuentes evaluadas
+
+### data912.com (API gratuita de mercado argentino)
+
+Probada desde GitHub Actions el 23/09/2026 (`scripts/sondear_data912.py`, workflow `sondeo.yml`). **Tiene históricos, no solo precios actuales.**
+
+| Endpoint | Qué da | Historia observada |
+|----------|--------|--------------------|
+| `/historical/stocks/{ticker}` | OHLC + volumen diario de acciones locales (GGAL, YPFD…) | desde 2001 (GGAL: 6.289 ruedas) |
+| `/historical/cedears/{ticker}` | OHLC + volumen diario de CEDEARs (SPY, AAPL…) | desde 2023 |
+| `/historical/bonds/{ticker}` | OHLC + volumen diario de bonos (AL30, GD30…) | desde 2021 |
+| `/live/arg_stocks`, `/live/arg_cedears`, `/live/arg_bonds`, `/live/usa_adrs`, `/live/usa_stocks` | Panel del día (puntas, último, volumen) | — |
+| `/live/mep`, `/live/ccl` | Dólar MEP y CCL por especie | — |
+| `/eod/volatilities/{ticker}`, `/eod/option_chain/{ticker}` | Volatilidades y cadena de opciones locales al cierre | — |
+
+Límite: 120 pedidos por minuto. **Advertencia del propio proveedor** (campo `info` de su API): "Purely for
+educational purposes API. Nothing here is real-time. Any resemblance to actual markets and real data is purely
+coincidental. I built this as a hobby". Los precios probados coinciden con el mercado, pero el proveedor no los
+garantiza y puede dar de baja el servicio. Por eso, si se integra, va como **fuente secundaria y de control**, no como
+principal: validar el CCL implícito contra `/live/ccl`, cubrir huecos de Yahoo `.BA` en acciones locales marcando el
+origen, y sumar bonos en dólares (AL30/GD30) para un riesgo país propio. Todavía no está integrada al pipeline.

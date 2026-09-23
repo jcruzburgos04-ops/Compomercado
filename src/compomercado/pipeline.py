@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import registro
-from .analitica import argentina, canastas
+from .analitica import argentina, canastas, huellas
 from .analitica import comportamiento as comp
 from .config import Proyecto
 from .datos.series import Series
@@ -76,6 +76,7 @@ class Resultados:
     nombres: dict[str, str]
     ultimas_fechas: dict = field(default_factory=dict)
     umbral_tramos: float = 0.05
+    huellas: huellas.Huellas | None = None
 
 
 def _nombre_canasta(nombre: str) -> str:
@@ -160,6 +161,11 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
     pilares = pond.pilares if pond is not None else pilares_igual
     tabla_base = estado.tabla_base(pilares["total"], spy) if "total" in pilares else pd.DataFrame()
 
+    # --- huellas de las caídas y análogos ---------------------------------------------------------
+    huellas_spy = None
+    if "SPY" in mapas and "total" in pilares:
+        huellas_spy = huellas.analizar(mapas["SPY"].episodios, riesgo, pilares_igual, pilares["total"], spy)
+
     # --- correlaciones actuales ---------------------------------------------------------------
     corr_cols = [t for t in CORRELACION if t in precios.columns]
     correlacion = precios[corr_cols].pct_change().tail(63).corr()
@@ -177,6 +183,8 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         valores.update({f"pilar_{k}": _ultimo(pilares_igual[k]) for k in pilares_igual.columns})
         if pond is not None:
             valores.update({f"pond_{k}": _ultimo(pond.pilares[k]) for k in pond.pilares.columns})
+        if huellas_spy is not None:
+            valores["analogos_prob"] = huellas_spy.vecinos_hoy.get("prob", np.nan)
         valores["spy_cierre"] = _ultimo(precios["SPY"])
         if registro.agregar(proyecto.dir_registro, "estado_diario.csv", fecha, valores):
             log.info("Registro forward: fila %s agregada", fecha.date())
@@ -221,6 +229,7 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         nombres=nombres,
         ultimas_fechas=_ultimas_fechas(S),
         umbral_tramos=umbral,
+        huellas=huellas_spy,
     )
 
 

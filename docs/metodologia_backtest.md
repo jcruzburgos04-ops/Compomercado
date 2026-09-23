@@ -163,6 +163,19 @@ Los indicadores no pesan igual: pesa más lo que más anticipó caídas. Código
 5. **Walk-forward anual**: los pesos de cada año se estiman con datos hasta 21 ruedas antes del 1 de enero (purga igual al horizonte más largo). La serie publicada es la fuera de muestra desde 2005.
 6. **Evaluación**: la pestaña Ponderaciones compara, fuera de muestra y por período, el total ponderado contra pesos iguales y contra referencias simples (SPY bajo su media de 200, nivel del VIX).
 
+## 11. Huellas de las caídas y análogos (implementado)
+
+Código: `src/compomercado/analitica/huellas.py`. Pestaña "Huellas y análogos" del dashboard.
+
+1. **Eventos**: los tramos zigzag de SPY ≥ 5 % (umbral en `config/analisis.yaml`, `caidas.umbral_mapa`). Solo cuentan los tramos con el riesgo total calculado una semana antes del pico.
+2. **Momentos**: 21 y 5 ruedas antes del pico, el pico, la confirmación (primer día con la caída ≥ umbral) y el valle. En cada uno se toma el percentil de riesgo de cada indicador y el puntaje de cada pilar (pesos iguales: existen desde los 90, los ponderados arrancan en 2005).
+3. **Comparación**: contra todos los días con dato del mismo indicador. Media, porcentaje de tramos en zona alta (≥ 70) contra el de un día cualquiera y z de la media (desvío de la base / √n). Los p-valores se corrigen por comparaciones múltiples con Benjamini-Hochberg; significativo = q < 0,10.
+4. **Papel de cada indicador**: *Anticipa* (significativamente alto un mes o una semana antes del pico), *Calma previa* (significativamente bajo antes del pico: complacencia), *Confirma* (alto recién en la confirmación), *Marca el piso* (alto en el valle).
+5. **Sesgos a tener en cuenta**: el pico es un máximo local elegido después, así que ahí la tendencia se ve tranquila por construcción. Los tramos se superponen en las crisis largas (2008, 2022), así que no son independientes y la significancia es optimista. Por eso la prueba que vale es la de los análogos, fuera de muestra.
+6. **Análogos**: el estado de cada día es el percentil histórico point-in-time de cada pilar más el del cambio del riesgo total en 21 ruedas (nueve dimensiones, todas en la misma escala). Distancia: diferencia cuadrática media sobre las dimensiones disponibles (mínimo seis). La probabilidad de un día es la fracción de sus 50 vecinos más cercanos que antecedió una caída ≥ 5 % en 21 ruedas (Y3). Solo se usan vecinos con al menos 21 ruedas de antigüedad (su resultado ya se conocía) y hacen falta 504 días previos con resultado.
+7. **Evaluación**: la misma que la ponderación (AUC contra Y1–Y3, frecuencia en el 20 % más alto) desde 2005 y por período, contra el total ponderado, el de pesos iguales y un combinado (promedio del total ponderado y el percentil point-in-time de la probabilidad). Se agrega una tabla de calibración (qué pasó según el nivel de la probabilidad).
+8. **Hoy**: los cinco días más parecidos, separados por 63 ruedas o más y sin contar el último semestre, con lo que hizo SPY después; y los tramos cuya semana previa más se parece a hoy (descriptivo). La probabilidad de cada día queda en el registro forward (`analogos_prob`).
+
 ## 9. Criterios para promover algo a "producción"
 
 Un indicador, modelo o regla pasa a producción solo si cumple todo esto:

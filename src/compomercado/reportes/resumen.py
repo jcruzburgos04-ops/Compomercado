@@ -13,6 +13,10 @@ def _pct(v: float) -> str:
     return "—" if v is None or pd.isna(v) else f"{v * 100:+.1f}%"
 
 
+def _pct0(v) -> str:
+    return "—" if v is None or pd.isna(v) else f"{v:.0%}"
+
+
 def texto(res: Resultados) -> str:
     L: list[str] = [f"COMPOMERCADO · datos al cierre del {res.fecha:%Y-%m-%d}"]
     o = res.origen or {}
@@ -95,6 +99,54 @@ def texto(res: Resultados) -> str:
         L.append("ÚLTIMOS TRAMOS DE CAÍDA DE SPY")
         for _, e in spy.episodios.sort_values("pico").tail(6).iterrows():
             L.append(f"  {e['pico']:%Y-%m-%d} → {e['valle']:%Y-%m-%d}  {e['profundidad']:+.1%}  {e.get('tipo', '')}")
+        L.append("")
+
+    hu = res.huellas
+    if hu is not None and not hu.tramos.empty:
+        from ..analitica.huellas import PREFIJO_PILAR
+
+        ids = {i.id: i.nombre for i in res.indicadores}
+        L.append(f"HUELLAS DE LAS CAÍDAS ({len(hu.tramos)} tramos ≥{res.umbral_tramos:.0%} con indicadores, "
+                 f"desde {hu.tramos['pico'].min():%Y})")
+        lec = hu.lectura[~hu.lectura.index.str.startswith(PREFIJO_PILAR)]
+        for papel in ("Anticipa: alto antes del pico", "Calma previa: bajo antes del pico", "Confirma: sube con la caída",
+                      "Marca el piso: máximo en el valle"):
+            d = lec[lec["papel"] == papel].sort_values("q_pre")
+            if d.empty:
+                continue
+            L.append(f"  {papel} ({len(d)}):")
+            for i, f in d.head(8).iterrows():
+                L.append(f"    {ids.get(i, i):<40} 1 mes {f['media_pre21']:3.0f} · 1 sem {f['media_pre5']:3.0f} · "
+                         f"conf {f['media_conf']:3.0f} · valle {f['media_valle']:3.0f} · normal {f['media_base']:3.0f}"
+                         f" · zona alta 1 sem {f['alta_pre5']:.0%} vs {f['alta_base']:.0%} · q {f['q_pre']:.3f}")
+        pl = hu.lectura[hu.lectura.index.str.startswith(PREFIJO_PILAR)]
+        L.append("  Pilares (1 mes / 1 semana antes / pico / confirmación / valle · normal):")
+        for i, f in pl.iterrows():
+            c = i[len(PREFIJO_PILAR):]
+            nombre = "Total" if c == "total" else PILARES.get(c, c)
+            L.append(f"    {nombre:<28} {f['media_pre21']:3.0f} {f['media_pre5']:4.0f} {f['media_pico']:4.0f} "
+                     f"{f['media_conf']:4.0f} {f['media_valle']:4.0f} · {f['media_base']:3.0f}  {f['papel']}")
+        v = hu.vecinos_hoy
+        L.append(f"  Análogos hoy: {_pct0(v.get('prob'))} de los {v.get('k')} días más parecidos antecedieron una "
+                 f"caída ≥5 % en 21 ruedas (día cualquiera: {_pct0(hu.base_y3)})")
+        ev = hu.evaluacion
+        if not ev.empty:
+            for _, f in ev[ev["periodo"] == "Todo el período"].iterrows():
+                lift = f["tope20_y3"] / f["base_y3"] if f["base_y3"] else float("nan")
+                L.append(f"    {f['variante']:<38} AUC 5d {f['auc_y1']:.3f} · 10d {f['auc_y2']:.3f} · 21d {f['auc_y3']:.3f}"
+                         f" · top 20%: {f['tope20_y3']:.0%} ({lift:.2f}x)")
+        if not hu.calibracion.empty:
+            L.append("    Calibración: " + " · ".join(
+                f"{k}: {f['realizado']:.0%} ({f['porcentaje_ruedas']:.0%} del tiempo)"
+                for k, f in hu.calibracion.iterrows() if f["ruedas"]))
+        if not hu.analogos_hoy.empty:
+            L.append("  Días más parecidos a hoy: " + "; ".join(
+                f"{d:%Y-%m-%d} (dist {f['distancia']:.0f}, peor caída 21r {f['caida_max_21']:+.1%})"
+                for d, f in hu.analogos_hoy.iterrows()))
+        if not hu.caidas_parecidas.empty:
+            L.append("  Caídas con semana previa parecida: " + "; ".join(
+                f"{f['pico']:%Y-%m-%d} {f['profundidad']:+.0%} {f.get('tipo', '')} (dist {f['distancia']:.0f})"
+                for _, f in hu.caidas_parecidas.head(5).iterrows()))
         L.append("")
 
     h = res.historia_larga

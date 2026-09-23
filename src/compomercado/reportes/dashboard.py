@@ -550,6 +550,209 @@ caída larga (2008, 2022) aparece como varias piernas.</p>
 """
 
 
+DIVERGENTE_RIESGO = [[round(1 - q, 2), c] for q, c in reversed(DIVERGENTE)]  # 0 = calma (azul), 100 = riesgo (rojo)
+NOMBRES_MOMENTO = {"pre21": "1 mes antes", "pre5": "1 semana antes", "pico": "Pico", "conf": "Confirmación",
+                   "valle": "Valle"}
+
+
+def _heatmap_riesgo(z: pd.DataFrame, alto: int, titulo: str = "Riesgo") -> go.Figure:
+    fig = go.Figure(go.Heatmap(
+        z=z.to_numpy(dtype=float), x=list(z.columns), y=list(z.index), colorscale=DIVERGENTE_RIESGO,
+        zmin=0, zmax=100, zmid=50, xgap=1, ygap=1, meta="divergente",
+        colorbar=dict(title=titulo, thickness=10, tickvals=[0, 30, 50, 70, 100]),
+        hovertemplate="%{y}<br>%{x}<br>" + titulo + ": %{z:.0f}<extra></extra>",
+    ))
+    fig = _layout(fig, alto)
+    fig.update_layout(hovermode="closest")
+    fig.update_yaxes(autorange="reversed", gridcolor="rgba(0,0,0,0)")
+    return fig
+
+
+def seccion_huellas(res: Resultados) -> str:
+    from ..analitica.huellas import MOMENTOS, PREFIJO_PILAR, ZONA_ALTA
+
+    h = res.huellas
+    if h is None or h.tramos.empty:
+        return "<p>Todavía no hay tramos con indicadores suficientes.</p>"
+    u = f"{res.umbral_tramos:.0%}".replace("%", " %")
+    tr = h.tramos
+    pil_cols = [c for c in res.pilares_igual.columns if c != "total"] + ["total"]
+    nombre_pil = {c: ("Total" if c == "total" else PILARES.get(c, c)) for c in pil_cols}
+    ids = {i.id: i for i in res.indicadores}
+    etiqueta = [f"{e['pico']:%Y-%m-%d} {e['profundidad']:.0%} {e.get('tipo', '') or ''}".strip() for _, e in tr.iterrows()]
+
+    # --- hoy ---------------------------------------------------------------------------------
+    prob = h.vecinos_hoy.get("prob", np.nan)
+    k = h.vecinos_hoy.get("k", 50)
+    veces = prob / h.base_y3 if h.base_y3 else np.nan
+    hero = f"""
+<div class="hero">
+  <div class="tile">
+    <div class="tile-etq">Probabilidad por análogos</div>
+    <div class="tile-num">{fmt(prob, 'pct0')}</div>
+    <div class="tile-sub">De los {k} días del pasado más parecidos a hoy, en {fmt(prob * k, 'int')} SPY cayó ≥5 % en
+    las 21 ruedas siguientes. En un día cualquiera: {fmt(h.base_y3, 'pct0')} ({fmt(veces, 'x')}).
+    Estado al {h.fecha:%d/%m/%Y}.</div>
+  </div>
+  <div class="nota"><p><strong>Cómo leerlo.</strong> Cada día se describe con sus ocho pilares y el cambio del
+  riesgo total en 21 ruedas (cada uno como percentil de su propia historia). Se buscan los {k} días del pasado más
+  parecidos y se cuenta cuántos antecedieron una caída. Solo se usan días cuyo resultado ya se conocía, así que la
+  serie se evalúa fuera de muestra igual que la ponderación (abajo).</p></div>
+</div>"""
+
+    a = h.analogos_hoy.copy()
+    t_analogos = ""
+    if not a.empty:
+        a["fecha"] = a.index
+        t_analogos = tabla(a, [("fecha", "Día parecido", "fecha"), ("distancia", "Distancia", "num",
+                                "Diferencia media en puntos de percentil (0 = idéntico)"),
+                               ("total", "Riesgo total ese día", "puntaje"),
+                               ("caida_max_21", "Peor caída en 21 ruedas", "pct"),
+                               ("caida_max_63", "Peor caída en 63 ruedas", "pct"), ("ret_63", "Retorno 63 ruedas", "pct")])
+    cp = h.caidas_parecidas.head(6)
+    t_parecidas = tabla(cp, [("pico", "Pico", "fecha"), ("valle", "Valle", "fecha"), ("profundidad", "Caída", "pct"),
+                             ("tipo", "Tipo", "texto"), ("distancia", "Distancia", "num")]) if not cp.empty else ""
+
+    # --- evaluación ----------------------------------------------------------------------------
+    ev = h.evaluacion.copy()
+    t_ev = ""
+    if not ev.empty:
+        ev["lift"] = ev["tope20_y3"] / ev["base_y3"]
+        orden_per = {p: k for k, p in enumerate(dict.fromkeys(ev["periodo"]))}
+        ev = ev.sort_values("periodo", key=lambda c: c.map(orden_per), kind="stable")
+        t_ev = tabla(ev, [("periodo", "Período", "texto"), ("variante", "Variante", "texto"),
+                          ("auc_y1", "AUC 3 %/5r", "num"), ("auc_y2", "AUC 5 %/10r", "num"),
+                          ("auc_y3", "AUC 5 %/21r", "num"),
+                          ("tope20_y3", "Caída ≥5 %/21r en el 20 % más alto", "pct0"),
+                          ("base_y3", "En todos los días", "pct0"), ("lift", "Cuántas veces más", "x")])
+    t_cal = ""
+    if not h.calibracion.empty:
+        t_cal = tabla(h.calibracion, [("__indice__", "Probabilidad por análogos", "texto"), ("ruedas", "Ruedas", "int"),
+                                      ("porcentaje_ruedas", "% del tiempo", "pct0"),
+                                      ("prob_media", "Probabilidad media", "pct0"),
+                                      ("realizado", "Pasó realmente", "pct0")])
+    pr = h.prob.dropna()
+    fig_p = go.Figure(go.Scatter(x=pr.index, y=pr, line=dict(color=AZUL, width=1.5), name="Análogos",
+                                 hovertemplate="%{y:.0%}"))
+    for _, e in tr[tr["pico"] >= (pr.index.min() if len(pr) else tr["pico"].min())].iterrows():
+        fig_p.add_vrect(x0=e["pico"], x1=e["valle"], fillcolor="rgba(227,73,72,0.14)", line_width=0, layer="below")
+    fig_p.add_hline(y=h.base_y3, line=dict(color=MUTED, dash="dot", width=1))
+    fig_p.update_yaxes(tickformat=".0%", rangemode="tozero")
+    fig_p = _layout(fig_p, 320)
+
+    # --- mapa de huellas por tramo --------------------------------------------------------------
+    hoy_fila = res.pilares_igual[pil_cols].dropna(how="all").iloc[-1]
+    pestañas, paneles = [], []
+    for m in ("pre21", "pre5", "pico", "conf", "valle"):
+        z = h.instantaneas[m][[PREFIJO_PILAR + c for c in pil_cols]].copy()
+        z.columns = [nombre_pil[c] for c in pil_cols]
+        z.index = etiqueta
+        z = z.iloc[::-1]
+        z = pd.concat([pd.DataFrame([hoy_fila.to_numpy()], columns=z.columns, index=[f"HOY ({h.fecha:%d/%m/%Y})"]), z])
+        activo = " activo" if m == "pre5" else ""
+        pestañas.append(f'<button class="subtab{activo}" data-panel="huella-{m}">{NOMBRES_MOMENTO[m]}</button>')
+        fig = _heatmap_riesgo(z, 16 * len(z) + 140, "Puntaje")
+        fig.update_layout(margin=dict(l=190, r=16, t=16, b=90))
+        fig.update_xaxes(side="top", tickangle=-30)
+        paneles.append(f'<div class="subpanel{activo}" id="huella-{m}">{grafico(fig, f"g-huella-{m}")}</div>')
+
+    # --- trayectorias ---------------------------------------------------------------------------
+    def fig_tray(t: pd.DataFrame, ancla: str) -> go.Figure:
+        z = t[pil_cols].T
+        z.index = [nombre_pil[c] for c in pil_cols]
+        f = _heatmap_riesgo(z, 330, "Mediana")
+        f.update_layout(margin=dict(l=190, r=16, t=16, b=40))
+        f.update_traces(x=list(t.index), hovertemplate="%{y}<br>%{x} ruedas desde el " + ancla + "<br>Mediana: %{z:.0f}<extra></extra>")
+        f.add_vline(x=0, line=dict(color=TINTA_2, width=1, dash="dot"))
+        f.update_xaxes(title=f"Ruedas desde el {ancla}")
+        return f
+
+    # --- indicadores ------------------------------------------------------------------------------
+    lec = h.lectura.copy()
+    ind = lec[~lec.index.str.startswith(PREFIJO_PILAR)].copy()
+    ind["nombre"] = [ids[i].nombre if i in ids else i for i in ind.index]
+    ind["pilar"] = [PILARES.get(ids[i].pilar, ids[i].pilar) if i in ids else "" for i in ind.index]
+    orden = {"Anticipa: alto antes del pico": 0, "Calma previa: bajo antes del pico": 1, "Confirma: sube con la caída": 2,
+             "Marca el piso: máximo en el valle": 3, "Sin patrón claro": 4}
+    ind["_o"] = ind["papel"].map(orden)
+    ind = ind.sort_values(["_o", "lift_pre5"], ascending=[True, False])
+    cols_ind = [("nombre", "Indicador", "texto"), ("pilar", "Pilar", "texto"), ("papel", "Papel en las caídas", "texto")]
+    cols_ind += [(f"media_{m}", NOMBRES_MOMENTO[m], "puntaje", "Percentil de riesgo medio en ese momento")
+                 for m in MOMENTOS]
+    cols_ind += [("media_base", "Día cualquiera", "puntaje", "Media de todos los días con dato"),
+                 ("alta_pre5", "En zona alta 1 sem. antes", "pct0", f"% de tramos con el indicador ≥{ZONA_ALTA:.0f}"),
+                 ("alta_base", "En zona alta, día cualquiera", "pct0"),
+                 ("lift_pre5", "Cuántas veces más", "x"),
+                 ("q_pre", "q antes del pico", "num", "Significancia corregida por comparaciones múltiples; < 0,10 = significativo"),
+                 ("n", "Tramos", "int")]
+    t_ind = tabla(ind, cols_ind)
+
+    pl = lec[lec.index.str.startswith(PREFIJO_PILAR)].copy()
+    pl.index = [nombre_pil.get(i[len(PREFIJO_PILAR):], i) for i in pl.index]
+    t_pil = tabla(pl, [("__indice__", "Pilar", "texto"), ("papel", "Papel", "texto")]
+                  + [(f"media_{m}", NOMBRES_MOMENTO[m], "puntaje") for m in MOMENTOS]
+                  + [("media_base", "Día cualquiera", "puntaje"), ("q_pre", "q antes del pico", "num")])
+
+    # --- por tipo --------------------------------------------------------------------------------
+    t_tipo = ""
+    if not h.por_tipo.empty:
+        partes = []
+        for m in ("pre5", "conf"):
+            d = h.por_tipo[m].copy()
+            d.columns = [nombre_pil.get(c, c) for c in d.columns]
+            d["tramos"] = h.por_tipo[("", "tramos")]
+            partes.append(f"<div><h4>{NOMBRES_MOMENTO[m]}</h4>" + tabla(
+                d, [("__indice__", "Tipo", "texto"), ("tramos", "Tramos", "int")]
+                + [(c, c, "puntaje") for c in d.columns if c != "tramos"]) + "</div>")
+        t_tipo = "".join(partes)
+
+    return f"""
+<p>Cómo estaban los {len(tr)} tramos de caída ≥{u} de SPY desde {tr['pico'].min():%Y} (los que tienen indicadores
+calculados) en cinco momentos: un mes y una semana antes del pico, el pico, la confirmación (el día en que la caída
+llega al {u}) y el valle. Sirve para dos cosas: saber qué se repite antes y durante las caídas, y buscar hoy días
+parecidos a los que antecedieron caídas.</p>
+{hero}
+<div class="dos">
+  <div><h3>Días del pasado más parecidos a hoy</h3><p class="pie">Uno por episodio (separados por 63 ruedas o más),
+  sin contar el último semestre. Qué pasó después con SPY.</p>{t_analogos}</div>
+  <div><h3>Caídas cuya semana previa más se parece a hoy</h3><p class="pie">Distancia entre el estado de hoy y el de
+  cada tramo una semana antes de su pico. Es descriptivo: el pronóstico calibrado es la probabilidad de arriba.</p>{t_parecidas}</div>
+</div>
+<h3>¿Anticipan algo los análogos? Evaluación fuera de muestra</h3>
+<p class="pie">Desde 2005, en años que no participaron del cálculo. El combinado promedia el riesgo total ponderado y
+el percentil histórico de la probabilidad por análogos.</p>
+{t_ev}
+<div class="dos">
+  <div><h4>Calibración: cuando los análogos dicen X, ¿qué pasó?</h4>{t_cal}</div>
+  <div><h4>Probabilidad por análogos en el tiempo</h4>{grafico(fig_p, "g-analogos")}
+  <p class="pie">En rojo, los tramos de caída ≥{u}. La línea punteada es la frecuencia en un día cualquiera.</p></div>
+</div>
+<h3>La huella de cada caída, pilar por pilar</h3>
+<p class="pie">Puntaje de cada pilar (pesos iguales, 0 = calma, 100 = máximo riesgo histórico) en el momento elegido.
+Arriba, hoy. El pico se conoce después: es un máximo del precio, así que ahí la tendencia se ve tranquila por
+construcción; lo que sirve para anticipar es lo que pasa antes.</p>
+<div class="subtabs">{"".join(pestañas)}</div>
+{"".join(paneles)}
+<h3>Trayectoria típica alrededor del pico y del valle</h3>
+<p class="pie">Mediana de todos los tramos, de 63 ruedas antes a 63 después.</p>
+<div class="dos"><div><h4>Alrededor del pico</h4>{grafico(fig_tray(h.trayectoria_pico, "pico"), "g-tray-pico")}</div>
+<div><h4>Alrededor del valle</h4>{grafico(fig_tray(h.trayectoria_valle, "valle"), "g-tray-valle")}</div></div>
+<h3>Qué indicadores se repiten en las caídas</h3>
+<p class="pie">Percentil de riesgo medio de cada indicador en cada momento, contra un día cualquiera. <strong>Anticipa</strong>:
+estuvo significativamente más alto que lo normal un mes o una semana antes del pico. <strong>Calma previa</strong>:
+estuvo significativamente más bajo (complacencia). <strong>Confirma</strong>: se dispara recién con la caída.
+<strong>Marca el piso</strong>: su máximo llega en el valle. Significativo = q &lt; 0,10 después de corregir por
+comparar muchos indicadores a la vez. Los tramos se superponen en las crisis largas (2008, 2022), así que la
+significancia es optimista: tomala como orden de importancia, no como certeza.</p>
+{t_ind}
+<h3>Pilares</h3>{t_pil}
+<h3>Huella por tipo de caída</h3>
+<p class="pie">Puntaje medio de cada pilar según el tipo de caída (reglas de la pestaña Caídas). Pocos tramos por tipo:
+es orientativo.</p>
+<div class="dos">{t_tipo}</div>
+"""
+
+
 def seccion_historia(res: Resultados) -> str:
     h = res.historia_larga
     if h is None:
@@ -836,9 +1039,15 @@ function mostrar(id) {
 }
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => mostrar(b.dataset.sec)));
 document.querySelectorAll(".subtab").forEach(b => b.addEventListener("click", () => {
-  const cont = b.closest("section");
-  cont.querySelectorAll(".subtab").forEach(x => x.classList.toggle("activo", x === b));
-  cont.querySelectorAll(".subpanel").forEach(p => p.classList.toggle("activo", p.id === b.dataset.panel));
+  // Cada grupo de pestañas maneja solo sus paneles: una sección puede tener varios grupos.
+  const grupo = b.closest(".subtabs");
+  grupo.querySelectorAll(".subtab").forEach(x => {
+    x.classList.toggle("activo", x === b);
+    const p = document.getElementById(x.dataset.panel);
+    if (p) p.classList.toggle("activo", x === b);
+  });
+  const p = document.getElementById(b.dataset.panel);
+  if (p && window.Plotly) p.querySelectorAll(".plotly-graph-div").forEach(d => Plotly.Plots.resize(d));
 }));
 document.querySelectorAll(".filtro-grupo").forEach(sel => sel.addEventListener("change", () => {
   sel.closest("section").querySelectorAll("table.filtrable tbody tr").forEach(tr => {
@@ -877,6 +1086,7 @@ SECCIONES = [
     ("ponderaciones", "Ponderaciones", seccion_ponderaciones),
     ("mapa", "Mapa de comportamiento", seccion_mapa),
     ("caidas", "Caídas", seccion_episodios),
+    ("huellas", "Huellas y análogos", seccion_huellas),
     ("historia", "Historia desde 1926", seccion_historia),
     ("correlacion", "Correlaciones", seccion_correlacion),
     ("argentina", "Argentina", seccion_argentina),

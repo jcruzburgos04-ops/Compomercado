@@ -19,10 +19,13 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
     assert res.historia_larga is not None and not res.historia_larga.tabla.empty
     assert "ccl" in res.argentina
     assert any(c.startswith("canasta:") for c in res.canastas)
+    assert res.huellas is not None and len(res.huellas.tramos) >= 1
+    assert res.huellas.prob.dropna().between(0, 1).all()
 
     ruta = construir(res, p.dir_sitio)
     html = ruta.read_text(encoding="utf-8")
-    for seccion in ("Estado del mercado", "Mapa de comportamiento", "Historia desde 1926", "Argentina", "Registro forward"):
+    for seccion in ("Estado del mercado", "Mapa de comportamiento", "Huellas y análogos", "Historia desde 1926",
+                    "Argentina", "Registro forward"):
         assert seccion in html
     assert "Esta sección falló" not in html
     # Los datos del test son sintéticos: el tablero tiene que avisarlo.
@@ -71,6 +74,7 @@ def test_parte_diario_en_texto(tmp_path):
     res = analizar(p, registrar=False, snapshot_opciones=False)
     t = texto(res)
     assert "RIESGO TOTAL" in t and "MAPA VS SPY" in t and "HISTORIA DESDE 1926" in t and "ARGENTINA" in t
+    assert "HUELLAS DE LAS CAÍDAS" in t
 
 
 def test_sello_de_origen_real(tmp_path):
