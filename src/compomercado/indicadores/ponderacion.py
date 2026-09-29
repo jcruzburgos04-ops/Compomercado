@@ -307,14 +307,15 @@ def analizar(indicadores: list[Indicador], riesgo: pd.DataFrame, total_igual: pd
                 "2015–2019": ("2015-01-01", "2019-12-31"), "2020 en adelante": ("2020-01-01", fin)}
     variantes = {"Ponderado dentro de pilares (principal)": pil["total"],
                  "Ponderado dentro y entre pilares": entre, "Pesos iguales (anterior)": total_igual}
-    fuera_activos = [p for p in FUERA_DEL_TOTAL if p in pil.columns]
+    fuera_activos = sorted(p for p in FUERA_DEL_TOTAL if p in pil.columns)
     if fuera_activos:
-        nombres = ", ".join(PILARES.get(p, p).lower() for p in fuera_activos)
+        nombres = " y ".join(f"pilar {p}" for p in fuera_activos)
         variantes[f"Principal + {nombres}"] = con_fuera
-        # Comparación justa: los mismos días en los que el pilar extra tiene dato.
+        # Comparación justa: si el pilar extra no tiene dato todos los días, también en los mismos días.
         con_dato = pil[fuera_activos].notna().any(axis=1)
-        variantes[f"Principal, solo días con {nombres}"] = pil["total"].where(con_dato)
-        variantes[f"Principal + {nombres}, mismos días"] = con_fuera.where(con_dato)
+        if not con_dato.loc[inicio:].all():
+            variantes[f"Principal, solo días con {nombres}"] = pil["total"].where(con_dato)
+            variantes[f"Principal + {nombres}, mismos días"] = con_fuera.where(con_dato)
     variantes.update(baselines)
     ev = evaluar(variantes, Y, periodos)
     log.info("Ponderación: pesos vigentes estimados hasta %s", vigentes.hasta)

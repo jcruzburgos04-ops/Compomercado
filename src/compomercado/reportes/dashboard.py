@@ -1049,8 +1049,8 @@ demuestra que mejora al sensor fuera de muestra (tabla del final).</p></div>
 <p class="pie">AUC contra las caídas de SPY (0,5 = no anticipa; por debajo de 0,48, funciona al revés de la hipótesis).
 El riesgo antes del pico y al confirmarse sale de la huella de los tramos de caída de 5 %.</p>{t_imp}
 <h3>El sensor con y sin este pilar (fuera de muestra)</h3>
-<p class="pie">Para que la comparación sea justa, las filas "mismos días" usan solo las ruedas en las que el pilar
-institucional tiene dato.</p>{t_var}
+<p class="pie">Mismas reglas que la pestaña Ponderaciones: pesos recalculados cada enero con datos anteriores. Si el
+pilar no tuviera dato todos los días, las filas "mismos días" comparan solo esas ruedas.</p>{t_var}
 """
 
 
