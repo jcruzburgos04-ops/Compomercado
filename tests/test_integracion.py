@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -25,13 +27,23 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
     ids = {ind.id for ind in res.indicadores}
     assert {"sp500_pct_200", "sp500_pct_50"} <= ids
     assert "sp500_pct_200" not in res.riesgo.columns   # sesgo de supervivencia: no entra al puntaje
+    # El pilar institucional se calcula y se evalúa, pero no suma al total.
+    assert "institucional" in res.pilares.columns and "cot_am_sp" in res.riesgo.columns
+    suman = [c for c in res.pilares_igual.columns if c not in ("total", "institucional")]
+    assert np.allclose(res.pilares_igual["total"].dropna(),
+                       res.pilares_igual[suman].mean(axis=1).loc[res.pilares_igual["total"].dropna().index])
+    assert any("institucional" in v for v in res.ponderacion.evaluacion["variante"])
+    assert res.institucional is not None and not res.institucional.posiciones.empty
+    assert res.anomalias is not None and not res.anomalias.evaluacion.empty
 
     ruta = construir(res, p.dir_sitio)
     html = ruta.read_text(encoding="utf-8")
     for seccion in ("Estado del mercado", "Mapa de comportamiento", "Huellas y análogos", "Historia desde 1926",
-                    "Registro forward"):
+                    "Registro forward", "Flujos institucionales", "Anomalías", "Posiciones hoy",
+                    "¿Qué anomalías sirven?", "Anomalías de factores"):
         assert seccion in html
-    assert "Argentina" not in html and "CCL" not in html
+    # Los gráficos llevan datos en base64: se busca "CCL" como palabra, no dentro de esos datos.
+    assert "Argentina" not in html and re.search(r"[\s>(]CCL[\s<),.]", html) is None
     assert "Amplitud del S&amp;P 500" in html or "Amplitud del S&P 500" in html
     assert "Calendario: próximas 5 semanas" in html and 'id="aviso-atraso"' in html
     assert "Sin ficha escrita" not in html and 'class="ficha"' in html
@@ -57,7 +69,7 @@ def test_indicadores_sin_look_ahead(tmp_path):
     q = sintetico.crear(tmp_path / "truncado")
     alm = Almacen(q.dir_datos)
     for nombre in ["precios/cierre_aj", "precios/cierre", "precios/apertura", "precios/maximo", "precios/minimo",
-                   "precios/volumen", "cboe", "sp500/cierre_aj"]:
+                   "precios/volumen", "cboe", "sp500/cierre_aj", "cftc/tff"]:
         alm.guardar(nombre, alm.leer(nombre).loc[:corte])
     # FRED: el dato con fecha d se publica en d + lag, así que a la fecha de corte solo se conocía hasta corte - lag.
     fred = alm.leer("fred")

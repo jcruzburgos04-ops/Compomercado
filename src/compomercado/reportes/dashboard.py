@@ -916,6 +916,268 @@ qué mostraron los datos. Hay {len(t)} indicadores; {n_cuentan} cuentan hoy en e
 """
 
 
+MERCADOS_GRAFICO = ["sp500", "nasdaq", "vix", "yen", "tesoro10", "russell"]
+COLOR_GRUPO = {"dealer": "#8a5cc2", "am": AZUL, "lev": NARANJA, "nr": MUTED}
+
+
+def seccion_institucional(res: Resultados) -> str:
+    from ..datos.proveedores.cftc import MERCADOS, NOMBRES_CATEGORIAS
+
+    inst = res.institucional
+    if inst is None:
+        return "<p>No hay datos de la CFTC ni de los bancos todavía.</p>"
+    pos = inst.posiciones
+
+    # --- hoy -----------------------------------------------------------------------------------
+    if inst.extremos:
+        lista = "".join(f"<li>{html.escape(f)}</li>" for f in inst.extremos)
+        extremos = f"<ul>{lista}</ul>"
+    else:
+        extremos = "<p>Ningún grupo está en un extremo (más de 2 desvíos contra sus últimos 3 años).</p>"
+    fecha_inf = f"{inst.fecha_informe:%d/%m/%Y}" if inst.fecha_informe is not None else "—"
+    fecha_uso = f"{inst.fecha_conocido:%d/%m/%Y}" if inst.fecha_conocido is not None else "—"
+    hero = f"""
+<div class="hero">
+  <div class="tile" style="max-width:440px">
+    <div class="tile-etq">Último informe de la CFTC</div>
+    <div class="tile-num" style="font-size:32px">{fecha_inf}</div>
+    <div class="tile-sub">Foto de las posiciones del martes; se publica el viernes y el sensor la usa desde el
+    {fecha_uso}.</div>
+  </div>
+  <div class="nota"><p><strong>Qué están mostrando.</strong></p>{extremos}</div>
+</div>"""
+
+    t_pos = ""
+    if not pos.empty:
+        orden_m = {k: n for n, k in enumerate(MERCADOS)}
+        orden_g = {g: n for n, g in enumerate(["dealer", "am", "lev", "nr"])}
+        p = pos.assign(_m=pos["clave"].map(orden_m), _g=pos["g"].map(orden_g)).sort_values(["_m", "_g"])
+        t_pos = tabla(p, [
+            ("mercado", "Mercado", "texto"), ("grupo", "Quién", "texto"),
+            ("neto", "Neto (% del interés abierto)", "pct", "Largos − cortos del grupo / interés abierto total"),
+            ("z", "Desvíos vs 3 años", "num", "z: cuánto se aparta el neto de su media de 156 semanas"),
+            ("indice", "Índice COT", "pct0", "0 % = el neto más bajo de 3 años; 100 % = el más alto"),
+            ("cambio_4s", "Cambio 4 semanas", "pct", "En puntos del interés abierto"),
+            ("lectura", "Lectura", "texto"), ("fecha", "Informe", "fecha")])
+
+    # --- gráficos por mercado ------------------------------------------------------------------
+    pestañas, paneles = [], []
+    for k, clave in enumerate([m for m in MERCADOS_GRAFICO if m in inst.netos]):
+        n = inst.netos[clave].dropna(how="all")
+        fig = make_subplots(rows=1, cols=1)
+        for g in n.columns:
+            fig.add_trace(go.Scatter(x=n.index, y=n[g], name=NOMBRES_CATEGORIAS[g], hovertemplate="%{y:.0%}",
+                                     line=dict(color=COLOR_GRUPO.get(g, MUTED), width=1.6)))
+        fig.add_hline(y=0, line=dict(color=EJE, width=1))
+        fig.update_yaxes(tickformat=".0%", title_text="Neto / interés abierto")
+        fig = _layout(fig, 360, leyenda=True)
+        _selector_rango(fig)
+        activo = " activo" if k == 0 else ""
+        pestañas.append(f'<button class="subtab{activo}" data-panel="inst-{clave}">{MERCADOS[clave]["nombre"]}</button>')
+        paneles.append(f'<div class="subpanel{activo}" id="inst-{clave}">{grafico(fig, f"g-inst-{clave}")}</div>')
+    graficos = (f'<h3>Posición neta por grupo, semana a semana</h3><div class="subtabs">{"".join(pestañas)}</div>'
+                f'{"".join(paneles)}') if pestañas else ""
+
+    # --- bancos ---------------------------------------------------------------------------------
+    t_bancos = ""
+    b = inst.bancos
+    if not b.empty:
+        b = b.copy()
+        b["valor_txt"] = [fmt(v, f) for v, f in zip(b["valor"], b["formato"], strict=True)]
+        t_bancos = tabla(b, [("nombre", "Indicador", "texto"), ("valor_txt", "Valor", "texto"),
+                             ("riesgo", "Percentil de riesgo", "puntaje"), ("fecha", "Dato conocido al", "fecha"),
+                             ("desc", "Qué mide", "texto")])
+    ids_bancos = [i for i in res.indicadores if i.id.startswith("bancos_")]
+    fig_b = ""
+    if ids_bancos:
+        filas_n = math.ceil(len(ids_bancos) / 2)
+        fb = make_subplots(rows=filas_n, cols=2, shared_xaxes=True, vertical_spacing=0.08,
+                           subplot_titles=[i.nombre for i in ids_bancos])
+        for k, i in enumerate(ids_bancos):
+            s = i.serie.dropna()
+            s = s.loc[s.index[-1] - pd.DateOffset(years=20):] if len(s) else s
+            fb.add_trace(go.Scatter(x=s.index, y=s, line=dict(color=AZUL, width=1.4), name=i.nombre,
+                                    hovertemplate="%{y:.1%}" if i.formato == "pct" else "%{y:,.1f}"),
+                         row=k // 2 + 1, col=k % 2 + 1)
+        fig_b = grafico(_layout(fb, 190 * filas_n + 60), "g-bancos")
+
+    # --- capacidad de anticipar -------------------------------------------------------------------
+    t_imp = ""
+    imp = inst.importancia
+    if not imp.empty:
+        imp = imp.copy()
+        lec = res.huellas.lectura if res.huellas is not None else pd.DataFrame()
+        imp["papel"] = [lec.at[i, "papel"] if not lec.empty and i in lec.index else "" for i in imp.index]
+        imp["media_pre5"] = [lec.at[i, "media_pre5"] if not lec.empty and i in lec.index else np.nan for i in imp.index]
+        imp["media_conf"] = [lec.at[i, "media_conf"] if not lec.empty and i in lec.index else np.nan for i in imp.index]
+        t_imp = tabla(imp, [("nombre", "Indicador", "texto"), ("desde", "Desde", "fecha"),
+                            ("auc_y1", "AUC 3 %/5r", "num"), ("auc_y2", "AUC 5 %/10r", "num"),
+                            ("auc_y3", "AUC 5 %/21r", "num"), ("auc_media", "AUC medio", "num"),
+                            ("veredicto", "Veredicto", "texto"),
+                            ("media_pre5", "Riesgo 1 semana antes del pico", "puntaje",
+                             "Percentil de riesgo medio una semana antes de los tramos de caída (50 = normal)"),
+                            ("media_conf", "Riesgo al confirmarse la caída", "puntaje"),
+                            ("papel", "Papel en las caídas", "texto")])
+    t_var = ""
+    pond = res.ponderacion
+    if pond is not None and not pond.evaluacion.empty:
+        ev = pond.evaluacion
+        ev = ev[ev["variante"].str.contains("institucional|Principal|principal", regex=True)].copy()
+        if not ev.empty:
+            ev["lift"] = ev["tope20_y3"] / ev["base_y3"]
+            t_var = tabla(ev, [("periodo", "Período", "texto"), ("variante", "Variante", "texto"),
+                               ("ruedas", "Ruedas", "int"), ("auc_y1", "AUC 3 %/5r", "num"),
+                               ("auc_y2", "AUC 5 %/10r", "num"), ("auc_y3", "AUC 5 %/21r", "num"),
+                               ("tope20_y3", "Caída ≥5 %/21r en el 20 % más alto", "pct0"),
+                               ("lift", "Cuántas veces más", "x")])
+    return f"""
+{hero}
+<div class="nota" style="margin-top:12px"><p><strong>Quién es quién.</strong> La CFTC publica cada semana las
+posiciones abiertas en futuros separadas por tipo de operador. <strong>Dealers</strong>: bancos y agentes que hacen de
+contraparte (sus clientes compran cobertura o exposición y ellos toman el otro lado). <strong>Asset managers</strong>:
+fondos de pensión, aseguradoras, fondos comunes y ETFs, el dinero institucional de largo plazo.
+<strong>Fondos apalancados</strong>: hedge funds, CTAs y trading de corto plazo. <strong>No reportables</strong>: los
+operadores chicos. Una parte de las posiciones son arbitrajes contra el contado (basis trade), por eso importa más el
+<em>cambio</em> y el extremo contra la propia historia que el nivel. Los balances de los bancos salen de la Fed (H.8 y
+H.4.1) y de la encuesta a oficiales de crédito.</p>
+<p><strong>Este pilar no suma al riesgo total.</strong> Se calcula, se evalúa igual que los demás y entra solo si
+demuestra que mejora al sensor fuera de muestra (tabla del final).</p></div>
+<h3>Posiciones hoy</h3>{t_pos}
+{graficos}
+<h3>Bancos: balances, liquidez y crédito</h3>{t_bancos}{fig_b}
+<h3>¿Sirvieron para anticipar caídas?</h3>
+<p class="pie">AUC contra las caídas de SPY (0,5 = no anticipa; por debajo de 0,48, funciona al revés de la hipótesis).
+El riesgo antes del pico y al confirmarse sale de la huella de los tramos de caída de 5 %.</p>{t_imp}
+<h3>El sensor con y sin este pilar (fuera de muestra)</h3>
+<p class="pie">Para que la comparación sea justa, las filas "mismos días" usan solo las ruedas en las que el pilar
+institucional tiene dato.</p>{t_var}
+"""
+
+
+def seccion_anomalias(res: Resultados) -> str:
+    an = res.anomalias
+    if an is None:
+        return "<p>No hay datos suficientes para detectar anomalías.</p>"
+    ev = an.evaluacion
+    act = an.activas
+    c_hoy = float(an.conteo.dropna().iloc[-1]) if an.conteo.notna().any() else np.nan
+    ct = an.conteo_tabla
+    grupo = "0" if c_hoy == 0 else "1" if c_hoy == 1 else "2" if c_hoy == 2 else "3 o más"
+    lectura_c = ""
+    if not ct.empty and grupo in ct.index and not _nulo(c_hoy):
+        f = ct.loc[grupo]
+        base = float((ct["caida"] * ct["ruedas"]).sum() / ct["ruedas"].sum())
+        cuantas = {"0": "Sin anomalías", "1": "Con 1 anomalía"}.get(grupo, f"Con {grupo} anomalías distintas")
+        lectura_c = (f"{cuantas} en 10 ruedas, SPY cayó ≥5 % en las 21 siguientes el "
+                     f"{fmt(f['caida'], 'pct0')} de las veces (cualquier día: {fmt(base, 'pct0')}).")
+    lista = ""
+    if not act.empty:
+        lista = "".join(f"<li><strong>{html.escape(r.nombre)}</strong> ({r.ultima:%d/%m}): {html.escape(r.veredicto)}</li>"
+                        for r in act.itertuples())
+        lista = f"<ul>{lista}</ul>"
+    else:
+        lista = "<p>Ningún detector marcó en las últimas 5 ruedas.</p>"
+    hero = f"""
+<div class="hero">
+  <div class="tile" style="max-width:440px">
+    <div class="tile-etq">Anomalías distintas en las últimas 10 ruedas</div>
+    <div class="tile-num">{fmt(c_hoy, 'int')}</div>
+    <div class="tile-sub">{lectura_c} AUC del conteo: {fmt(an.conteo_auc, 'num')}. Datos al {an.fecha:%d/%m/%Y}.</div>
+  </div>
+  <div class="nota"><p><strong>Activas (últimas 5 ruedas).</strong></p>{lista}</div>
+</div>"""
+
+    t_ev = ""
+    if not ev.empty:
+        e = ev.copy()
+        e["ret21_vs"] = e["ret21"] - e["ret21_base"]
+        e["ret63_vs"] = e["ret63"] - e["ret63_base"]
+        orden = {"Anticipa caídas, también desde máximos": 0, "Aparece con el estrés ya en curso": 1,
+                 "Sugiere riesgo, sin significancia": 2, "Contraria: después hay menos caídas": 3,
+                 "No anticipa caídas": 4, "Pocos casos para juzgar": 5}
+        e["_o"] = e["veredicto"].map(orden)
+        e = e.sort_values(["_o", "lift"], ascending=[True, False])
+        t_ev = tabla(e, [
+            ("nombre", "Anomalía", "texto"), ("familia", "Familia", "texto"), ("desde", "Desde", "fecha"),
+            ("episodios", "Episodios", "int"), ("por_anio", "Por año", "num"),
+            ("p_caida", "Caída ≥5 %/21r después", "pct0"), ("base", "Cualquier día", "pct0"),
+            ("lift", "Cuántas veces más", "x"), ("q", "q (BH)", "num", "Significancia corregida por probar muchos detectores"),
+            ("p_caida_calma", "Desde máximos: caída después", "pct0",
+             "Solo eventos con SPY a menos de 3 % de su máximo de 63 ruedas"),
+            ("lift_calma", "Desde máximos: veces más", "x"), ("n_calma", "Desde máximos: episodios", "int"),
+            ("cobertura_antes", "Tramos de 5 % avisados el mes previo", "pct0"),
+            ("azar_antes", "Lo que daría el azar", "pct0"),
+            ("concentracion", "Concentración en caídas", "x", "Frecuencia dentro de los tramos bajistas / frecuencia general"),
+            ("ret21_vs", "Retorno 21r vs normal", "pct"), ("ret63_vs", "Retorno 63r vs normal", "pct"),
+            ("veredicto", "Veredicto", "texto"), ("ultima", "Última vez", "fecha")])
+
+    # Línea de tiempo: SPY y los días marcados.
+    spy = res.precios["SPY"].dropna()
+    dets = sorted(an.detectores, key=lambda d: d.familia)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.04, row_heights=[0.35, 0.65])
+    fig.add_trace(go.Scatter(x=spy.index, y=spy, line=dict(color=AZUL, width=1.5), name="SPY",
+                             hovertemplate="%{y:.2f}"), row=1, col=1)
+    for d in dets:
+        dias = d.serie.index[d.serie.fillna(0) > 0]
+        fig.add_trace(go.Scatter(x=dias, y=[d.nombre] * len(dias), mode="markers", name=d.nombre,
+                                 marker=dict(size=6, color=NARANJA, line=dict(width=0.5, color="#fcfcfb")),
+                                 hovertemplate="%{x|%d/%m/%Y}"), row=2, col=1)
+    if "SPY" in res.mapas:
+        for _, t in res.mapas["SPY"].episodios.iterrows():
+            fig.add_vrect(x0=t["pico"], x1=t["valle"], fillcolor="rgba(227,73,72,0.12)", line_width=0, layer="below")
+    fig.update_yaxes(type="log", row=1, col=1)
+    fig.update_layout(hovermode="closest")
+    fig = _layout(fig, 26 * len(dets) + 320)
+    fig.update_layout(hovermode="closest")
+    _selector_rango(fig)
+    fig.update_xaxes(range=[spy.index[-1] - pd.DateOffset(years=3), spy.index[-1]])
+
+    t_ct = tabla(ct, [("__indice__", "Anomalías distintas en 10 ruedas", "texto"), ("ruedas", "Ruedas", "int"),
+                      ("porcentaje", "% del tiempo", "pct0"), ("caida", "Caída ≥5 %/21r después", "pct0"),
+                      ("ret21", "Retorno mediano 21 ruedas", "pct")]) if not ct.empty else ""
+
+    from ..analitica.anomalias import ERAS
+    t_cal = ""
+    if not an.calendario.empty:
+        cols = [("efecto", "Efecto", "texto"), ("dias_pct", "% de los días", "pct0"),
+                ("dentro_bps", "Retorno diario en esos días (pb)", "num"), ("fuera_bps", "Resto de los días (pb)", "num"),
+                ("t_Todo", "t (todo)", "num")]
+        for era in ERAS:
+            cols += [(f"dif_{era}", f"Diferencia {era} (pb)", "num"), (f"t_{era}", f"t {era}", "num")]
+        cols.append(("vigencia", "¿Sigue?", "texto"))
+        t_cal = tabla(an.calendario, cols)
+    t_fac = ""
+    if not an.factores.empty:
+        cols = [("__indice__", "Factor", "texto"), ("anual_Todo", "Prima anual (todo)", "pct"), ("t_Todo", "t", "num")]
+        for era in ERAS:
+            cols += [(f"anual_{era}", f"Prima {era}", "pct"), (f"t_{era}", f"t {era}", "num")]
+        cols += [("caida_Todo", "Peor caída", "pct"), ("vigencia", "¿Sigue?", "texto")]
+        t_fac = tabla(an.factores, cols)
+    inicio = f"{an.inicio_calendario:%Y}" if an.inicio_calendario is not None else "—"
+    return f"""
+{hero}
+<div class="nota" style="margin-top:12px"><p><strong>Cómo se mide.</strong> Cada detector marca un día con datos
+conocidos al cierre (umbrales contra su propia historia previa). Un <em>episodio</em> es el primer día marcado después
+de 21 ruedas sin marcas, así las ventanas no se pisan. Para cada anomalía: con qué frecuencia SPY cayó ≥5 % en las 21
+ruedas siguientes contra cualquier día (test binomial con corrección de Benjamini-Hochberg), lo mismo solo cuando
+apareció con SPY cerca de máximos (anticipar desde la calma es lo difícil), qué parte de los tramos de caída de 5 %
+tuvo la anomalía el mes previo al pico contra lo que daría el azar, y el retorno posterior (una anomalía puede marcar
+estrés y a la vez un buen punto de compra).</p></div>
+<h3>¿Qué anomalías sirven?</h3>{t_ev}
+<h3>Cuándo aparecieron</h3>
+<p class="pie">Arriba SPY (en rojo, los tramos de caída de 5 %); abajo, cada punto es un día marcado.</p>
+{grafico(fig, "g-anomalias")}
+<h3>Varias anomalías juntas</h3>{t_ct}
+<h3>Anomalías de calendario, desde {inicio}</h3>
+<p class="pie">Retorno diario medio del mercado de EE. UU. (Kenneth French con dividendos, completado con el S&amp;P 500)
+en los días del efecto contra el resto, en puntos básicos. |t| ≥ 2 ≈ significativo. "¿Sigue?" compara toda la
+historia con la última era: muchas anomalías se debilitaron después de publicarse.</p>{t_cal}
+<h3>Anomalías de factores (tamaño, valor, momentum)</h3>
+<p class="pie">Prima anual de cada factor de Fama-French por era. No son señales de caída: sirven para saber qué
+estilos siguen pagando.</p>{t_fac}
+"""
+
+
 def seccion_screener(res: Resultados) -> str:
     if not res.screener:
         return "<p>Sin screens configurados (config/screener.yaml).</p>"
@@ -1263,6 +1525,8 @@ SECCIONES = [
     ("mapa", "Mapa de comportamiento", seccion_mapa),
     ("caidas", "Caídas", seccion_episodios),
     ("huellas", "Huellas y análogos", seccion_huellas),
+    ("institucional", "Flujos institucionales", seccion_institucional),
+    ("anomalias", "Anomalías", seccion_anomalias),
     ("screener", "Screener", seccion_screener),
     ("fichas", "Fichas", seccion_fichas),
     ("historia", "Historia desde 1926", seccion_historia),
@@ -1317,7 +1581,7 @@ def construir(res: Resultados, destino: Path) -> Path:
         secciones.append(f'<section id="{id_}" class="{activo.strip()}"><h2>{titulo}</h2>{cuerpo}</section>')
     o = res.origen or {}
     if o.get("real"):
-        origen = (f'<p class="origen">✓ Datos reales descargados de Yahoo Finance, FRED, CBOE y Kenneth French '
+        origen = (f'<p class="origen">✓ Datos reales descargados de Yahoo Finance, FRED, CBOE, CFTC y Kenneth French '
                   f'({html.escape(str(o.get("descargado_utc") or "")[:16].replace("T", " "))} UTC).</p>')
     else:
         origen = ('<p class="aviso-prueba">✖ DATOS DE PRUEBA: este tablero no se armó con una descarga real de '

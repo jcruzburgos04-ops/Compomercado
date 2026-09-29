@@ -166,6 +166,15 @@ fred:
   DCOILWTICO: {lag_dias: 7, nombre: "Petróleo WTI spot"}
   DEXJPUS: {lag_dias: 7, nombre: "Yenes por dólar"}
   USREC: {lag_dias: 365, nombre: "Recesiones NBER (solo etiqueta)"}
+  # Bancos (Fed H.8, semanal: el dato del miércoles se publica el viernes de la semana siguiente).
+  TOTBKCR: {lag_dias: 10, nombre: "Crédito bancario total (bancos comerciales)"}
+  DPSACBW027SBOG: {lag_dias: 10, nombre: "Depósitos en bancos comerciales"}
+  TOTCI: {lag_dias: 10, nombre: "Préstamos comerciales e industriales"}
+  # Balance de la Fed (H.4.1, semanal: el dato del miércoles se publica el jueves).
+  WRESBAL: {lag_dias: 2, nombre: "Reservas de los bancos en la Fed"}
+  WLCFLPCL: {lag_dias: 2, nombre: "Préstamos de la ventanilla de descuento (crédito primario)"}
+  # Encuesta a oficiales de crédito (trimestral; se publica unas 5 semanas después de la fecha del dato).
+  DRTSCILM: {lag_dias: 45, nombre: "Bancos que endurecen el crédito a empresas (neto %)"}
 
 # Series CBOE (fuente primaria de la familia VIX; Yahoo queda como respaldo).
 cboe: [VIX, VIX9D, VIX3M, VIX6M, VVIX, SKEW, VXN, RVX, OVX, GVZ]
@@ -174,8 +183,13 @@ cboe: [VIX, VIX9D, VIX3M, VIX6M, VVIX, SKEW, VXN, RVX, OVX, GVZ]
 # Tiene sesgo de supervivencia: sirve para leer la amplitud de hoy, no para backtestear.
 sp500: {activo: true}
 
+# Posiciones por tipo de operador (CFTC, informe Traders in Financial Futures). El informe es del martes
+# y se publica el viernes: lag_dias 4 lo deja disponible recién el lunes siguiente.
+cftc: {activo: true, lag_dias: 4}
+
 # Historia larga sin sesgo de supervivencia.
 ken_french:
   - 49_Industry_Portfolios_daily
   - 12_Industry_Portfolios_daily
   - F-F_Research_Data_Factors_daily
+  - F-F_Momentum_Factor_daily

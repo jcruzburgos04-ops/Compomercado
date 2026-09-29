@@ -65,7 +65,20 @@ def crear(tmp: Path, inicio="2012-01-02", fin="2026-09-18", semilla=0) -> Proyec
     pesos = np.linspace(2, 0.1, 120)
     pd.DataFrame({"ticker": list(sp), "nombre": list(sp), "sector": "X", "peso": pesos / pesos.sum(),
                   "fecha": fechas[-1], "fuente": "prueba"}).to_csv(p.dir_datos / "sp500_componentes.csv", index=False)
-    for fuente in ("yahoo", "fred", "cboe", "ken_french", "sp500"):
+    alm.guardar("french/F-F_Momentum_Factor_daily",
+                pd.DataFrame({"Mom": rng.normal(0.0003, 0.008, len(fechas_ff))}, index=fechas_ff))
+    # Informe TFF de la CFTC (semanal, martes).
+    martes = pd.date_range(inicio, fin, freq="W-TUE")
+    cot = {}
+    for m in ("sp500", "nasdaq", "russell", "vix", "tesoro10", "yen"):
+        oi = rng.uniform(4e5, 6e5, len(martes))
+        cot[f"{m}__oi"] = oi
+        for g in ("dealer", "am", "lev", "otros", "nr"):
+            base = rng.uniform(0.05, 0.3)
+            cot[f"{m}__{g}_l"] = oi * np.clip(base + np.cumsum(rng.normal(0, 0.01, len(martes))), 0.01, 0.9)
+            cot[f"{m}__{g}_s"] = oi * np.clip(base + np.cumsum(rng.normal(0, 0.01, len(martes))), 0.01, 0.9)
+    alm.guardar("cftc/tff", pd.DataFrame(cot, index=martes))
+    for fuente in ("yahoo", "fred", "cboe", "ken_french", "sp500", "cftc"):
         alm.registrar_descarga(fuente, origen="sintetico", fallidos=[])
     reporte_precios(cierre, pd.DatetimeIndex(fechas), set()).to_csv(p.dir_datos / "calidad_precios.csv")
     return p

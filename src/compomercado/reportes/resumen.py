@@ -175,6 +175,64 @@ def texto(res: Resultados) -> str:
                 for _, f in hu.caidas_parecidas.head(5).iterrows()))
         L.append("")
 
+    inst = res.institucional
+    if inst is not None:
+        fecha = f"informe del {inst.fecha_informe:%Y-%m-%d}" if inst.fecha_informe is not None else "sin informe CFTC"
+        L.append(f"FLUJOS INSTITUCIONALES ({fecha}; no suma al puntaje)")
+        pos = inst.posiciones
+        if not pos.empty:
+            for clave in ("sp500", "nasdaq", "russell", "vix", "tesoro10", "yen", "dolar", "bitcoin"):
+                d = pos[pos["clave"] == clave]
+                if d.empty:
+                    continue
+                L.append(f"  {d['mercado'].iloc[0]:<15} " + " · ".join(
+                    f"{f.grupo.split(' (')[0]} {f.neto:+.0%} (z {f.z:+.1f}, 4s {f.cambio_4s:+.1%})" for f in d.itertuples()))
+        for frase in inst.extremos:
+            L.append(f"  ! {frase}")
+        if not inst.bancos.empty:
+            L.append("  Bancos: " + " · ".join(
+                f"{f.nombre} {f.valor:+.1%} (p{f.riesgo:.0f})" if f.formato == "pct" else f"{f.nombre} {f.valor:,.1f} (p{f.riesgo:.0f})"
+                for f in inst.bancos.itertuples()))
+        if not inst.importancia.empty:
+            L.append("  Capacidad de anticipar (AUC medio): " + "; ".join(
+                f"{f.nombre} {f.auc_media:.3f} [{f.veredicto}]" for f in inst.importancia.itertuples()))
+        L.append("")
+
+    an = res.anomalias
+    if an is not None:
+        c = an.conteo.dropna()
+        L.append(f"ANOMALÍAS (distintas en 10 ruedas: {c.iloc[-1]:.0f}" + (f", AUC del conteo {an.conteo_auc:.3f})"
+                                                                           if len(c) else ")"))
+        if not an.activas.empty:
+            for _, f in an.activas.iterrows():
+                L.append(f"  ACTIVA {f['ultima']:%d/%m}: {f['nombre']} — {f['veredicto']} "
+                         f"(caída después {f['p_caida']:.0%} vs {f['base']:.0%})")
+        else:
+            L.append("  Ninguna activa en las últimas 5 ruedas")
+        ev = an.evaluacion
+        if not ev.empty:
+            for _, f in ev.sort_values("lift", ascending=False).iterrows():
+                L.append(f"  {f['nombre']:<44} {f['episodios']:4.0f} ep · caída {f['p_caida']:4.0%} vs {f['base']:4.0%}"
+                         f" ({f['lift']:.2f}x, q {f['q']:.3f}) · desde máx {f['p_caida_calma']:4.0%} "
+                         f"({f['lift_calma']:.2f}x, n {f['n_calma']:.0f}) · avisó {f['cobertura_antes']:.0%} vs azar "
+                         f"{f['azar_antes']:.0%} · r63 {f['ret63'] - f['ret63_base']:+.1%} · {f['veredicto']}")
+        if not an.conteo_tabla.empty:
+            L.append("  Conteo: " + " · ".join(f"{k}: caída {f['caida']:.0%} ({f['porcentaje']:.0%} del tiempo)"
+                                             for k, f in an.conteo_tabla.iterrows()))
+        if not an.calendario.empty:
+            L.append(f"  Calendario desde {an.inicio_calendario:%Y} (diferencia en pb/día, t; última era):")
+            for _, f in an.calendario.iterrows():
+                L.append(f"    {f['efecto']:<62} todo {f.get('dif_Todo', float('nan')):+5.1f} (t {f.get('t_Todo', float('nan')):+.1f})"
+                         f" · 2010–hoy {f.get('dif_2010–hoy', float('nan')):+5.1f} (t {f.get('t_2010–hoy', float('nan')):+.1f})"
+                         f" · {f['vigencia']}")
+        if not an.factores.empty:
+            L.append("  Factores (prima anual, t):")
+            for i, f in an.factores.iterrows():
+                eras = " · ".join(f"{e} {f.get(f'anual_{e}', float('nan')):+.1%} (t {f.get(f't_{e}', float('nan')):+.1f})"
+                                  for e in ("Todo", "1926–1962", "1963–1992", "1993–2009", "2010–hoy"))
+                L.append(f"    {i:<44} {eras} · {f['vigencia']}")
+        L.append("")
+
     if res.screener:
         L.append("SCREENER")
         for s in res.screener:

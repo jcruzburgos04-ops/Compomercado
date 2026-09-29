@@ -17,6 +17,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from ..datos.proveedores import cftc
 from ..datos.series import Series
 
 log = logging.getLogger(__name__)
@@ -32,7 +33,12 @@ PILARES = {
     "global": "Global",
     "correlacion": "Estructura de correlación",
     "flujos": "Flujos estimados",
+    "institucional": "Institucional: CFTC y bancos (no suma al total)",
 }
+
+# Pilares que se calculan y se evalúan pero no suman al total: entran solo si demuestran que agregan
+# información fuera de muestra (regla de la Fase 5 del roadmap).
+FUERA_DEL_TOTAL = {"institucional"}
 
 SECTORES_BASE = ["XLK", "XLF", "XLV", "XLE", "XLI", "XLY", "XLP", "XLU", "XLB"]
 CANARIOS = ["SMH", "KRE", "IYT", "XRT", "ITB"]
@@ -375,6 +381,53 @@ def calcular(S: Series) -> list[Indicador]:
             desc="Variación de SPY que daría vuelta la señal más cercana")
     agregar("vol_control", "Exposición fondos vol-control", "flujos", -1, lambda: exposicion_vol_control(spy), "x",
             desc="Estimada con objetivo 10 % y tope 1,5x")
+
+    # Institucional: posiciones por tipo de operador (CFTC) y balances de los bancos (Fed).
+    # No suma al total (FUERA_DEL_TOTAL): se evalúa aparte.
+    cot = S.cot()
+    diario = S.semanal_a_diario
+
+    def neto_z(mercado: str, grupo: str) -> pd.Series:
+        return diario(cftc.z_movil(cftc.neto(cftc.mercado(cot, mercado), grupo)))
+
+    if not cot.empty:
+        z3 = "Neto (largos − cortos) / interés abierto, en desvíos contra los últimos 3 años. "
+        agregar("cot_am_sp", "Asset managers en el S&P 500 (z 3 años)", "institucional", +1,
+                lambda: neto_z("sp500", "am"), desc=z3 + "Alto = el dinero institucional está muy comprado")
+        agregar("cot_lev_sp", "Fondos apalancados en el S&P 500 (z 3 años)", "institucional", -1,
+                lambda: neto_z("sp500", "lev"), desc=z3 + "Bajo = fondos de cobertura muy vendidos")
+        agregar("cot_dealer_sp", "Dealers (bancos) en el S&P 500 (z 3 años)", "institucional", +1,
+                lambda: neto_z("sp500", "dealer"), desc=z3 + "Alto = los bancos absorben ventas de sus clientes")
+        agregar("cot_nr_sp", "Operadores chicos en el S&P 500 (z 3 años)", "institucional", +1,
+                lambda: neto_z("sp500", "nr"), desc=z3 + "Alto = el minorista está muy comprado")
+        agregar("cot_am_nasdaq", "Asset managers en el Nasdaq 100 (z 3 años)", "institucional", +1,
+                lambda: neto_z("nasdaq", "am"), desc=z3 + "Alto = institucionales muy comprados en tecnología")
+        agregar("cot_lev_vix", "Fondos apalancados en el VIX (z 3 años)", "institucional", -1,
+                lambda: neto_z("vix", "lev"), desc=z3 + "Bajo = muy vendidos de volatilidad (complacencia)")
+        agregar("cot_lev_yen", "Fondos apalancados en el yen (z 3 años)", "institucional", -1,
+                lambda: neto_z("yen", "lev"), desc=z3 + "Bajo = carry trade cargado (riesgo de desarme)")
+        agregar("cot_lev_10y", "Fondos apalancados en el Tesoro 10a (z 3 años)", "institucional", -1,
+                lambda: neto_z("tesoro10", "lev"), desc=z3 + "Bajo = basis trade cargado (riesgo de liquidez)")
+        agregar("cot_am_cambio", "Asset managers en el S&P 500: cambio 4 semanas", "institucional", -1,
+                lambda: diario(cftc.neto(cftc.mercado(cot, "sp500"), "am").diff(4)), "pct",
+                "Variación del neto en puntos del interés abierto. Negativo = están reduciendo")
+    agregar("bancos_credito", "Crédito bancario (13 semanas)", "institucional", -1,
+            lambda: S.fred("TOTBKCR").pct_change(63, fill_method=None), "pct",
+            "Crédito total de los bancos comerciales (Fed H.8). Cae = los bancos achican el balance")
+    agregar("bancos_depositos", "Depósitos bancarios (13 semanas)", "institucional", -1,
+            lambda: S.fred("DPSACBW027SBOG").pct_change(63, fill_method=None), "pct",
+            "Fed H.8. Caída = salida de depósitos (como en marzo de 2023)")
+    agregar("bancos_ci", "Préstamos a empresas (13 semanas)", "institucional", +1,
+            lambda: S.fred("TOTCI").pct_change(63, fill_method=None), "pct",
+            "Fed H.8. Suba brusca = las empresas usan sus líneas de crédito para cubrirse")
+    agregar("bancos_reservas", "Reservas de los bancos en la Fed (13 semanas)", "institucional", -1,
+            lambda: S.fred("WRESBAL").pct_change(63, fill_method=None), "pct",
+            "Fed H.4.1. Caída = menos liquidez en el sistema")
+    agregar("bancos_ventanilla", "Ventanilla de descuento de la Fed", "institucional", +1,
+            lambda: S.fred("WLCFLPCL"), desc="Préstamos de crédito primario (Fed H.4.1). Suba = bancos que "
+            "necesitan liquidez de urgencia")
+    agregar("bancos_sloos", "Bancos que endurecen el crédito", "institucional", +1, lambda: S.fred("DRTSCILM"),
+            desc="Encuesta a oficiales de crédito de la Fed (trimestral): % neto que endurece condiciones a empresas")
     return salida
 
 
@@ -393,7 +446,8 @@ def puntajes(indicadores: list[Indicador]) -> tuple[pd.DataFrame, pd.DataFrame]:
         if ids:
             pilares[pilar] = riesgo_df[ids].mean(axis=1, skipna=True)
     pil = pd.DataFrame(pilares)
-    pil["total"] = pil.mean(axis=1, skipna=True).where(pil.notna().sum(axis=1) >= 3)
+    suman = pil[[c for c in pil.columns if c not in FUERA_DEL_TOTAL]]
+    pil["total"] = suman.mean(axis=1, skipna=True).where(suman.notna().sum(axis=1) >= 3)
     return riesgo_df, pil
 
 

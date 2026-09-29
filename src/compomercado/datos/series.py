@@ -79,6 +79,23 @@ class Series:
         # Relleno limitado: una serie discontinuada no se arrastra indefinidamente.
         return s.reindex(s.index.union(cal)).ffill(limit=70).reindex(cal).rename(serie)
 
+    # --- CFTC: posiciones por tipo de operador ---------------------------------------------
+    def cot(self, respetar_lag: bool = True) -> pd.DataFrame:
+        """Informe TFF semanal (columnas "mercado__campo"). Con `respetar_lag`, cada semana queda
+        indexada en la fecha en que se conoció (martes del informe + lag_dias)."""
+        t = self._tabla("cftc/tff")
+        if t.empty or not respetar_lag:
+            return t
+        t = t.copy()
+        t.index = t.index + pd.Timedelta(days=self.p.cftc["lag_dias"])
+        return t
+
+    def semanal_a_diario(self, s: pd.Series, limite: int = 15) -> pd.Series:
+        """Serie semanal (ya indexada en su fecha de publicación) en ruedas de EE. UU."""
+        cal = self.calendario
+        s = s.dropna()
+        return s.reindex(s.index.union(cal)).ffill(limit=limite).reindex(cal)
+
     # --- Ken French --------------------------------------------------------
     def french(self, nombre: str) -> pd.DataFrame:
         return self._tabla(f"french/{nombre}")

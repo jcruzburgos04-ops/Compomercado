@@ -144,6 +144,12 @@ class Proyecto:
         return bool((self.universos.get("sp500") or {}).get("activo", False))
 
     @property
+    def cftc(self) -> dict:
+        """Informe TFF de la CFTC: {"activo": bool, "lag_dias": int}."""
+        c = self.universos.get("cftc") or {}
+        return {"activo": bool(c.get("activo", False)), "lag_dias": int(c.get("lag_dias", 4))}
+
+    @property
     def ken_french(self) -> list[str]:
         return list(self.universos.get("ken_french", []) or [])
 

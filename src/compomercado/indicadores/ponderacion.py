@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import rankdata
 
-from .estado import PILARES, Indicador, caida_maxima_futura
+from .estado import FUERA_DEL_TOTAL, PILARES, Indicador, caida_maxima_futura
 
 log = logging.getLogger(__name__)
 
@@ -189,6 +189,8 @@ def calcular_pesos(indicadores: list[Indicador], riesgo: pd.DataFrame, Y: pd.Dat
             estado = "poca historia"
         elif f["auc_media"] < AUC_INFORMA:
             estado = "no anticipa caídas"
+        elif pilar in FUERA_DEL_TOTAL:
+            estado = "informa, pero queda fuera del total (en evaluación)"
         else:
             estado = "incluido"
             elegibles.append(pilar)
@@ -214,17 +216,20 @@ def _pilares(riesgo: pd.DataFrame, peso_ind: dict[str, pd.Series]) -> pd.DataFra
     return pd.DataFrame({p: _promedio_ponderado(riesgo, w) for p, w in peso_ind.items()})
 
 
-def compuesto(riesgo: pd.DataFrame, pesos: Pesos, entre_pilares: bool = True) -> pd.DataFrame:
-    """Pilares ponderados por dentro y total. Con `entre_pilares=False`, los pilares pesan igual."""
+def compuesto(riesgo: pd.DataFrame, pesos: Pesos, entre_pilares: bool = True,
+              con_fuera: bool = False) -> pd.DataFrame:
+    """Pilares ponderados por dentro y total. Con `entre_pilares=False`, los pilares pesan igual.
+    Los pilares de FUERA_DEL_TOTAL se calculan pero solo suman con `con_fuera` (para evaluarlos)."""
     pil = _pilares(riesgo, pesos.peso_ind)
     if pil.empty:
         return pil
+    suman = pil[[c for c in pil.columns if con_fuera or c not in FUERA_DEL_TOTAL]]
     if entre_pilares and len(pesos.peso_pilar) >= 2:
         w = pesos.peso_pilar
         disponibles = pil[w.index].notna().sum(axis=1)
         pil["total"] = _promedio_ponderado(pil, w).where(disponibles >= min(MIN_PILARES, len(w)))
     else:
-        pil["total"] = pil.mean(axis=1, skipna=True).where(pil.notna().sum(axis=1) >= MIN_PILARES)
+        pil["total"] = suman.mean(axis=1, skipna=True).where(suman.notna().sum(axis=1) >= MIN_PILARES)
     return pil
 
 
@@ -234,6 +239,7 @@ def compuesto(riesgo: pd.DataFrame, pesos: Pesos, entre_pilares: bool = True) ->
 class Ponderacion:
     pilares: pd.DataFrame           # principal: pilares ponderados por dentro + total con pilares iguales
     total_entre: pd.Series          # alternativa evaluada: también ponderado entre pilares
+    total_con_fuera: pd.Series      # alternativa evaluada: sumando los pilares de FUERA_DEL_TOTAL
     pesos_vigentes: Pesos           # los que se usan este año
     peso_pilar_total: pd.Series     # peso efectivo de cada pilar en el total (iguales)
     historial: pd.DataFrame         # año x pilar: importancia (AUC) estimada ese año
@@ -243,7 +249,7 @@ class Ponderacion:
 
 def walk_forward(indicadores: list[Indicador], riesgo: pd.DataFrame, Y: pd.DataFrame, primer_anio: int = 2005):
     fechas = riesgo.index
-    partes, partes_entre, historial = [], [], {}
+    partes, partes_entre, partes_fuera, historial = [], [], [], {}
     vigentes = None
     for anio in range(primer_anio, fechas.max().year + 1):
         prueba = fechas[fechas.year == anio]
@@ -258,14 +264,16 @@ def walk_forward(indicadores: list[Indicador], riesgo: pd.DataFrame, Y: pd.DataF
         # Se calcula sobre toda la historia hasta fin de año: los percentiles ya son point-in-time.
         dentro = compuesto(riesgo.loc[: prueba[-1]], pesos, entre_pilares=False)
         entre = compuesto(riesgo.loc[: prueba[-1]], pesos, entre_pilares=True)["total"]
+        fuera = compuesto(riesgo.loc[: prueba[-1]], pesos, entre_pilares=False, con_fuera=True)["total"]
         partes.append(dentro.loc[prueba])
         partes_entre.append(entre.loc[prueba])
+        partes_fuera.append(fuera.loc[prueba])
         historial[anio] = pesos.pilares["auc_media"]
         vigentes = pesos
     if not partes:
-        return pd.DataFrame(), pd.Series(dtype=float), None, pd.DataFrame()
-    return (pd.concat(partes).sort_index(), pd.concat(partes_entre).sort_index(), vigentes,
-            pd.DataFrame(historial).T.sort_index())
+        return pd.DataFrame(), pd.Series(dtype=float), pd.Series(dtype=float), None, pd.DataFrame()
+    return (pd.concat(partes).sort_index(), pd.concat(partes_entre).sort_index(),
+            pd.concat(partes_fuera).sort_index(), vigentes, pd.DataFrame(historial).T.sort_index())
 
 
 def evaluar(variantes: dict[str, pd.Series], Y: pd.DataFrame, periodos: dict[str, tuple]) -> pd.DataFrame:
@@ -289,7 +297,7 @@ def evaluar(variantes: dict[str, pd.Series], Y: pd.DataFrame, periodos: dict[str
 def analizar(indicadores: list[Indicador], riesgo: pd.DataFrame, total_igual: pd.Series,
              spy: pd.Series, baselines: dict[str, pd.Series], primer_anio: int = 2005) -> Ponderacion | None:
     Y = objetivos(spy.reindex(riesgo.index))
-    pil, entre, vigentes, historial = walk_forward(indicadores, riesgo, Y, primer_anio)
+    pil, entre, con_fuera, vigentes, historial = walk_forward(indicadores, riesgo, Y, primer_anio)
     if vigentes is None or pil.empty:
         log.warning("Ponderación: no hay historia suficiente para estimar pesos")
         return None
@@ -299,10 +307,19 @@ def analizar(indicadores: list[Indicador], riesgo: pd.DataFrame, total_igual: pd
                 "2015–2019": ("2015-01-01", "2019-12-31"), "2020 en adelante": ("2020-01-01", fin)}
     variantes = {"Ponderado dentro de pilares (principal)": pil["total"],
                  "Ponderado dentro y entre pilares": entre, "Pesos iguales (anterior)": total_igual}
+    fuera_activos = [p for p in FUERA_DEL_TOTAL if p in pil.columns]
+    if fuera_activos:
+        nombres = ", ".join(PILARES.get(p, p).lower() for p in fuera_activos)
+        variantes[f"Principal + {nombres}"] = con_fuera
+        # Comparación justa: los mismos días en los que el pilar extra tiene dato.
+        con_dato = pil[fuera_activos].notna().any(axis=1)
+        variantes[f"Principal, solo días con {nombres}"] = pil["total"].where(con_dato)
+        variantes[f"Principal + {nombres}, mismos días"] = con_fuera.where(con_dato)
     variantes.update(baselines)
     ev = evaluar(variantes, Y, periodos)
     log.info("Ponderación: pesos vigentes estimados hasta %s", vigentes.hasta)
-    activos = [p for p in pil.columns if p != "total"]
+    activos = [p for p in pil.columns if p != "total" and p not in FUERA_DEL_TOTAL]
     peso_total = pd.Series(1 / len(activos), index=activos) if activos else pd.Series(dtype=float)
-    return Ponderacion(pilares=pil, total_entre=entre, pesos_vigentes=vigentes, peso_pilar_total=peso_total,
+    return Ponderacion(pilares=pil, total_entre=entre, total_con_fuera=con_fuera, pesos_vigentes=vigentes,
+                       peso_pilar_total=peso_total,
                        historial=historial, evaluacion=ev, inicio_oos=inicio)

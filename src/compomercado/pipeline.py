@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import registro
-from .analitica import calendario, canastas, huellas, screener
+from .analitica import anomalias, calendario, canastas, huellas, institucional, screener
 from .analitica import comportamiento as comp
 from .config import Proyecto
 from .datos.series import Series
@@ -81,6 +81,8 @@ class Resultados:
     fichas: dict = field(default_factory=dict)
     screener: list = field(default_factory=list)
     canastas_corr: dict = field(default_factory=dict)
+    institucional: institucional.Institucional | None = None
+    anomalias: anomalias.Anomalias | None = None
 
 
 def _nombre_canasta(nombre: str) -> str:
@@ -182,6 +184,10 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
 
     sp500_info = _sp500(S)
 
+    # --- flujos de bancos e instituciones y anomalías -----------------------------------------------
+    inst = institucional.analizar(S.cot(respetar_lag=False), proyecto.cftc["lag_dias"], indicadores, riesgo, spy)
+    anom = anomalias.analizar(S, precios, mapas["SPY"].episodios if "SPY" in mapas else pd.DataFrame(), indicadores)
+
     # --- screener y correlación interna de las canastas ------------------------------------------
     screens = []
     if "SPY" in mapas:
@@ -212,6 +218,9 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
             valores["analogos_prob"] = huellas_spy.vecinos_hoy.get("prob", np.nan)
         if sp500_info.get("top10") is not None:
             valores["sp500_top10"] = sp500_info["top10"]
+        if anom is not None:
+            valores["anomalias_conteo"] = _ultimo(anom.conteo)
+            valores["anomalias_activas"] = ";".join(anom.activas.index) if not anom.activas.empty else ""
         valores["spy_cierre"] = _ultimo(precios["SPY"])
         if registro.agregar(proyecto.dir_registro, "estado_diario.csv", fecha, valores):
             log.info("Registro forward: fila %s agregada", fecha.date())
@@ -261,6 +270,8 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         fichas=proyecto.fichas,
         screener=screens,
         canastas_corr=canastas_corr,
+        institucional=inst,
+        anomalias=anom,
     )
 
 

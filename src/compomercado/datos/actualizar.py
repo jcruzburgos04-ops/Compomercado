@@ -10,7 +10,7 @@ from ..config import Proyecto
 from .almacen import Almacen
 from .calidad import reporte_precios
 from .proveedores import calendario as calendario_oficial
-from .proveedores import cboe, fred, french, sp500, yahoo
+from .proveedores import cboe, cftc, fred, french, sp500, yahoo
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +45,9 @@ def actualizar_todo(proyecto: Proyecto) -> dict[str, list[str]]:
         alm.guardar("cboe", tabla)
     alm.registrar_descarga("cboe", origen="descarga", url="https://cdn.cboe.com", series=len(proyecto.series_cboe), fallidos=fallidos_cboe)
     fallos["cboe"] = fallidos_cboe
+
+    if proyecto.cftc["activo"]:
+        fallos["cftc"] = actualizar_cftc(alm)
 
     fallos["ken_french"] = []
     for nombre in proyecto.ken_french:
@@ -88,3 +91,17 @@ def actualizar_sp500(proyecto: Proyecto, alm: Almacen) -> list[str]:
     alm.registrar_descarga("sp500", origen="descarga", url=comp["fuente"].iloc[0], tickers=len(tickers),
                            fallidos=fallidos)
     return fallidos
+
+
+def actualizar_cftc(alm: Almacen) -> list[str]:
+    """Posiciones por tipo de operador (CFTC TFF). Devuelve los mercados sin datos."""
+    try:
+        tabla, faltan, fuente = cftc.descargar()
+    except Exception as e:  # noqa: BLE001
+        log.warning("CFTC: %s", e)
+        return ["todos"]
+    if tabla.empty:
+        return ["todos"]
+    alm.guardar("cftc/tff", tabla)
+    alm.registrar_descarga("cftc", origen="descarga", url=fuente, semanas=len(tabla), fallidos=faltan)
+    return faltan

@@ -488,3 +488,95 @@ vol_control:
   frecuencia: diaria
   lag: 0
   hipotesis: Fondos que ajustan exposición por volatilidad venden cuando sube; con exposición alta hay más para vender.
+
+# --- Institucional: CFTC y bancos (se calcula y se evalúa, no suma al total) --------------------
+cot_am_sp:
+  formula: "Neto de los asset managers en futuros del S&P 500 (largos − cortos) / interés abierto, en desvíos contra las últimas 156 semanas"
+  fuente: CFTC, informe Traders in Financial Futures (futuros)
+  frecuencia: semanal (martes)
+  lag: 4 días (se publica el viernes; se usa desde el lunes)
+  hipotesis: Fondos de pensión, aseguradoras y fondos comunes muy comprados dejan poco comprador marginal; los extremos suelen preceder correcciones.
+cot_lev_sp:
+  formula: Neto de los fondos apalancados en futuros del S&P 500 / interés abierto, z de 156 semanas
+  fuente: CFTC TFF
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Fondos de cobertura y CTAs muy vendidos anticipan debilidad si siguen la tendencia; parte de la posición es arbitraje contra el contado (basis trade), así que la lectura es ruidosa.
+cot_dealer_sp:
+  formula: Neto de los dealers (bancos) en futuros del S&P 500 / interés abierto, z de 156 semanas
+  fuente: CFTC TFF
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Los bancos son contraparte; si quedan más comprados que lo habitual es porque sus clientes están vendiendo o cubriéndose.
+cot_nr_sp:
+  formula: Neto de los operadores que no llegan al umbral de reporte en el S&P 500 / interés abierto, z de 156 semanas
+  fuente: CFTC TFF
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Sentimiento minorista; el exceso de optimismo de los chicos suele ser contrario.
+cot_am_nasdaq:
+  formula: Neto de los asset managers en futuros del Nasdaq 100 / interés abierto, z de 156 semanas
+  fuente: CFTC TFF
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Concentración institucional en tecnología; un extremo comprado deja al índice expuesto a una rotación.
+cot_lev_vix:
+  formula: Neto de los fondos apalancados en futuros del VIX / interés abierto, z de 156 semanas
+  fuente: CFTC TFF (CBOE Futures Exchange)
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Muy vendidos de volatilidad = complacencia y riesgo de cierre forzado si el VIX salta (febrero de 2018).
+cot_lev_yen:
+  formula: Neto de los fondos apalancados en futuros del yen / interés abierto, z de 156 semanas
+  fuente: CFTC TFF (CME)
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Muy vendidos de yen = carry trade cargado; su desarme contagia a las acciones (agosto de 2024).
+cot_lev_10y:
+  formula: Neto de los fondos apalancados en futuros del Tesoro 10 años / interés abierto, z de 156 semanas
+  fuente: CFTC TFF (CBOT)
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Muy vendidos = basis trade apalancado; si se desarma seca la liquidez del Tesoro (marzo de 2020).
+cot_am_cambio:
+  formula: Variación en 4 semanas del neto de los asset managers en el S&P 500, en puntos del interés abierto
+  fuente: CFTC TFF
+  frecuencia: semanal (martes)
+  lag: 4 días
+  hipotesis: Una reducción rápida de la exposición institucional acompaña o anticipa la venta.
+bancos_credito:
+  formula: Variación en 63 ruedas (13 semanas) del crédito total de los bancos comerciales
+  fuente: FRED TOTBKCR (Fed H.8, desestacionalizado)
+  frecuencia: semanal (miércoles)
+  lag: 10 días
+  hipotesis: Bancos que achican el balance restringen el crédito a la economía y a los mercados.
+bancos_depositos:
+  formula: Variación en 63 ruedas de los depósitos en bancos comerciales
+  fuente: FRED DPSACBW027SBOG (Fed H.8)
+  frecuencia: semanal (miércoles)
+  lag: 10 días
+  hipotesis: La salida de depósitos obliga a los bancos a vender activos o endeudarse (marzo de 2023).
+bancos_ci:
+  formula: Variación en 63 ruedas de los préstamos comerciales e industriales
+  fuente: FRED TOTCI (Fed H.8)
+  frecuencia: semanal (miércoles)
+  lag: 10 días
+  hipotesis: Una suba brusca indica empresas que retiran sus líneas de crédito por precaución (2008, marzo de 2020).
+bancos_reservas:
+  formula: Variación en 63 ruedas de las reservas de los bancos en la Fed
+  fuente: FRED WRESBAL (Fed H.4.1)
+  frecuencia: semanal (miércoles)
+  lag: 2 días
+  hipotesis: Reservas en baja = menos liquidez para intermediar; con reservas escasas aparecen tensiones en los repos (septiembre de 2019).
+bancos_ventanilla:
+  formula: Préstamos de crédito primario de la Fed (nivel)
+  fuente: FRED WLCFLPCL (Fed H.4.1)
+  frecuencia: semanal (miércoles)
+  lag: 2 días
+  hipotesis: Bancos que recurren a la ventanilla de descuento necesitan liquidez de urgencia; se dispara en crisis bancarias.
+bancos_sloos:
+  formula: Porcentaje neto de bancos que endurecen las condiciones de crédito a empresas grandes y medianas
+  fuente: FRED DRTSCILM (encuesta a oficiales de crédito de la Fed)
+  frecuencia: trimestral
+  lag: 45 días
+  hipotesis: El endurecimiento del crédito precede a las recesiones y a las caídas largas.

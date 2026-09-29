@@ -30,7 +30,7 @@ import pandas as pd
 from scipy.stats import norm
 
 from ..indicadores import ponderacion
-from ..indicadores.estado import caida_maxima_futura, percentil_expansivo
+from ..indicadores.estado import FUERA_DEL_TOTAL, caida_maxima_futura, percentil_expansivo
 
 log = logging.getLogger(__name__)
 
@@ -387,7 +387,8 @@ def analizar(eps: pd.DataFrame, riesgo: pd.DataFrame, pilares_igual: pd.DataFram
 
     # Análogos.
     Y = ponderacion.objetivos(spy.reindex(cal))
-    F = rasgos(pilares_igual)
+    # Los análogos usan solo los pilares que suman al total (los que están en evaluación no cambian el espacio).
+    F = rasgos(pilares_igual.drop(columns=[c for c in FUERA_DEL_TOTAL if c in pilares_igual.columns]))
     desde = pd.Timestamp(f"{primer_anio}-01-01")
     inicio_prob = F.dropna(thresh=MIN_DIMS).index.min()
     prob = probabilidad_analogos(F, Y["y3"], desde=inicio_prob)
