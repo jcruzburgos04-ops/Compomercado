@@ -202,8 +202,6 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
 
     # --- registro forward -----------------------------------------------------------------------
     ahora_ny = datetime.now(ZoneInfo("America/New_York"))
-    hoy_ny = pd.Timestamp(ahora_ny.date())
-    rueda_cerrada = ahora_ny.weekday() < 5 and (ahora_ny.hour, ahora_ny.minute) >= (16, 30)
     if registrar:
         valores = {f"ind_{i.id}": _ultimo(i.serie) for i in indicadores}
         # pilar_* = pesos iguales (así se registró desde el primer día); pond_* = ponderado.
@@ -217,12 +215,12 @@ def analizar(proyecto: Proyecto, registrar: bool = True, snapshot_opciones: bool
         valores["spy_cierre"] = _ultimo(precios["SPY"])
         if registro.agregar(proyecto.dir_registro, "estado_diario.csv", fecha, valores):
             log.info("Registro forward: fila %s agregada", fecha.date())
-        # Un snapshot refleja la última rueda cerrada: la de hoy si ya pasó el cierre, o la
-        # anterior si la corrida es antes de la apertura (la corrida diaria es a la mañana).
-        # Durante la rueda las cadenas son intradía: no se registran.
-        fecha_snap = hoy_ny if rueda_cerrada else fecha
-        en_rueda = ahora_ny.weekday() < 5 and (9, 30) <= (ahora_ny.hour, ahora_ny.minute) < (16, 30)
-        if snapshot_opciones and not en_rueda:
+        # Las cadenas de opciones se guardan antes de la apertura: el open interest de la rueda anterior
+        # se publica a la madrugada. A la noche y durante la rueda no se registran. El snapshot queda
+        # con la fecha de la última rueda cerrada.
+        fecha_snap = fecha
+        antes_de_apertura = ahora_ny.weekday() >= 5 or (ahora_ny.hour, ahora_ny.minute) < (9, 30)
+        if snapshot_opciones and antes_de_apertura:
             from .datos import opciones
 
             snap = opciones.snapshot_varios(["SPY", "QQQ", "IWM"])

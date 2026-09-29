@@ -31,3 +31,14 @@ def test_estacionalidad_usa_solo_anios_previos():
     e = cal.estacionalidad(p, pd.Timestamp("2026-09-10"))
     assert e["anios"] == 26 and e["mes_positivo"] == 0.0 and e["mes_medio"] < 0
     assert np.isfinite(e["adelante_medio"])
+
+
+def test_sesiones_siguientes_para_el_aviso_de_atraso():
+    from compomercado.reportes.dashboard import _sesiones_siguientes
+
+    s = _sesiones_siguientes(pd.Timestamp("2026-09-25"), n=2)     # viernes
+    assert [x["fecha"] for x in s] == ["28/09", "29/09"]
+    # 16:00 de Nueva York (horario de verano) + 1 hora de margen = 21:00 UTC
+    assert pd.Timestamp(s[0]["cierre"], unit="ms", tz="UTC") == pd.Timestamp("2026-09-28 21:00", tz="UTC")
+    s = _sesiones_siguientes(pd.Timestamp("2026-11-25"), n=1)     # miércoles antes de Acción de Gracias
+    assert s[0]["fecha"] == "27/11"

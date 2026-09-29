@@ -33,7 +33,7 @@ def test_pipeline_y_dashboard_de_punta_a_punta(tmp_path):
         assert seccion in html
     assert "Argentina" not in html and "CCL" not in html
     assert "Amplitud del S&amp;P 500" in html or "Amplitud del S&P 500" in html
-    assert "Calendario: próximas 5 semanas" in html
+    assert "Calendario: próximas 5 semanas" in html and 'id="aviso-atraso"' in html
     assert "Sin ficha escrita" not in html and 'class="ficha"' in html
     assert "Refugios con fuerza" in html and "La consulta tiene un error" not in html
     assert {s["estado"] for s in res.screener} <= {"ok", "no_aplica"}

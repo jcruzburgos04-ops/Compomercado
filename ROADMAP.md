@@ -254,7 +254,7 @@ ALERTAS NUEVAS
   · Divergencia de amplitud (1ª en 34 ruedas) · VIX sube con SPY en suba 3 días seguidos
 ```
 
-Formato elegido: **dashboard estático en GitHub Pages**, regenerado por GitHub Actions cada mañana hábil antes de la apertura de EE. UU. (10:30 UTC), con la rueda anterior completa Es HTML con gráficos interactivos (Plotly), no necesita servidor. Las alertas (Telegram o email) quedan como opción futura.
+Formato elegido: **dashboard estático en GitHub Pages**, regenerado por GitHub Actions cada día hábil después del cierre de EE. UU. (22:47 UTC) y de respaldo a la madrugada (06:17 UTC). Es HTML con gráficos interactivos (Plotly), no necesita servidor. Las alertas (Telegram o email) quedan como opción futura.
 
 ### 5.9 Mercados: EE. UU. y las mayores bolsas del mundo
 
@@ -443,7 +443,7 @@ Compomercado/
 | Datos | **Solo gratuitos.** Lo que no esté disponible se construye con fórmulas propias | Catálogo de proxies propios ([catálogo §D](docs/catalogo_variables.md#d-proxies-propios-para-datos-pagos)) + **snapshots diarios** para acumular historia desde hoy (opciones, flujos de ETF) |
 | Uso diario | **Dashboard** | HTML estático con gráficos interactivos, publicado en **GitHub Pages** |
 | Validación | Sin historial de trades: **backtest del pasado + forward test** | Registro diario inmutable de señales desde el primer día; las reglas se congelan antes de evaluarlas en vivo |
-| Dónde corre | **GitHub** | GitHub Actions corre el pipeline cada mañana hábil antes de la apertura (Yahoo tarda horas en cerrar la barra diaria), publica el dashboard en Pages y commitea el registro forward |
+| Dónde corre | **GitHub** | GitHub Actions corre el pipeline después del cierre de EE. UU. y de respaldo a la madrugada (GitHub demora los cron varias horas, por eso hay dos corridas), publica el dashboard en Pages y commitea el registro forward |
 
 ---
 

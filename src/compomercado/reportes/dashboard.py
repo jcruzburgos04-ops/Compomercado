@@ -1026,8 +1026,8 @@ def seccion_forward(res: Resultados) -> str:
         cols = [c for c in cols if c[0] == "__indice__" or c[0] in o.columns]
         cuerpo += "<h3>Snapshots de opciones (historia propia)</h3>" + tabla(o.sort_index(ascending=False).head(30), cols)
     return f"""
-<p>Cada mañana hábil, antes de la apertura, se guarda una fila de la última rueda cerrada con todos los indicadores y puntajes tal como se
-veían ese día (rama <code>registro</code> del repositorio). Nunca se reescriben filas pasadas: es el forward
+<p>Cada día hábil, después del cierre de EE. UU. (o en la corrida de respaldo de la madrugada), se guarda una fila de
+la última rueda cerrada con todos los indicadores y puntajes tal como se veían ese día (rama <code>registro</code> del repositorio). Nunca se reescriben filas pasadas: es el forward
 test del sensor. También se guardan snapshots de cadenas de opciones y de ETFs para construir historia
 propia de put/call, skew, GEX y flujos, que no existe gratis.</p>
 {cuerpo}
@@ -1130,6 +1130,7 @@ p { max-width: 900px; }
 .estado { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; margin-top: 6px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--borde); }
 .estado::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
 .origen { font-size: 13px; color: var(--tinta-2); margin: 4px 0 0; }
+.aviso-atraso { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--warning); color: var(--tinta); }
 .aviso-prueba { margin: 8px 0 0; padding: 8px 12px; border-radius: 8px; border: 2px solid var(--critical); color: var(--tinta); font-weight: 600; }
 .estado.good { --c: var(--good); } .estado.warning { --c: var(--warning); } .estado.serious { --c: var(--serious); } .estado.critical { --c: var(--critical); }
 .nota { flex: 1; min-width: 260px; background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 4px 16px; font-size: 14px; }
@@ -1157,12 +1158,27 @@ a { color: var(--acento); }
 <body>
 <header>
   <h1>Compomercado</h1>
-  <p class="sub">Sensor de comportamiento de mercado y sectores · datos al cierre del __FECHA__ · generado __GENERADO__ UTC</p>
+  <p class="sub">Sensor de comportamiento de mercado y sectores · datos al cierre del __FECHA__ · generado __GENERADO__ UTC
+  · se actualiza cada día hábil después del cierre de EE. UU. y de madrugada</p>
   __ORIGEN__
+  <p class="aviso-atraso" id="aviso-atraso" hidden></p>
 </header>
 <nav><div class="inner">__NAV__</div></nav>
 <main>__SECCIONES__</main>
 <script>
+// Aviso de atraso: ruedas de EE. UU. que ya cerraron y todavía no están en los datos.
+const SESIONES = __SESIONES__;
+(function avisoAtraso() {
+  const pendientes = SESIONES.filter(s => s.cierre <= Date.now());
+  if (!pendientes.length) return;
+  const el = document.getElementById("aviso-atraso");
+  const n = pendientes.length;
+  el.textContent = `⚠ Datos al cierre del __FECHA__: ${n === 1 ? "falta la rueda" : "faltan las ruedas"} del ` +
+    pendientes.map(s => s.fecha).join(", ") + ", que ya " + (n === 1 ? "cerró" : "cerraron") + ". Se " +
+    (n === 1 ? "incorpora" : "incorporan") + " en la próxima actualización (después del cierre o de madrugada; " +
+    "GitHub a veces la demora unas horas).";
+  el.hidden = false;
+})();
 const TEMAS = {
   claro: {tinta: "#52514e", grilla: "#e1e0d9", eje: "#c3c2b7", medio: "#f0efec", borde: "#fcfcfb"},
   oscuro: {tinta: "#c3c2b7", grilla: "#2c2c2a", eje: "#383835", medio: "#383835", borde: "#1a1a19"},
@@ -1273,6 +1289,18 @@ def exportar_csv(res: Resultados, destino: Path) -> None:
     (d / "resumen.json").write_text(json.dumps(resumen), encoding="utf-8")
 
 
+def _sesiones_siguientes(fecha: pd.Timestamp, n: int = 30, margen_horas: float = 1.0) -> list[dict]:
+    """Próximas ruedas de EE. UU. después de `fecha`, con el momento (epoch ms) desde el que ya
+    deberían estar en los datos: cierre de las 16:00 de Nueva York + `margen_horas`."""
+    from ..analitica.calendario import RUEDA
+
+    salida = []
+    for d in pd.date_range(pd.Timestamp(fecha) + pd.Timedelta(days=1), periods=n, freq=RUEDA):
+        cierre = pd.Timestamp(d.year, d.month, d.day, 16, tz="America/New_York") + pd.Timedelta(hours=margen_horas)
+        salida.append({"fecha": f"{d:%d/%m}", "cierre": int(cierre.tz_convert("UTC").timestamp() * 1000)})
+    return salida
+
+
 def construir(res: Resultados, destino: Path) -> Path:
     destino.mkdir(parents=True, exist_ok=True)
     nav, secciones = [], []
@@ -1296,6 +1324,7 @@ def construir(res: Resultados, destino: Path) -> Path:
                   'las fuentes y no refleja el mercado.</p>')
     pagina = (PLANTILLA.replace("__PLOTLY__", PLOTLY_JS)
               .replace("__ORIGEN__", origen)
+              .replace("__SESIONES__", json.dumps(_sesiones_siguientes(res.fecha)))
               .replace("__FECHA__", f"{res.fecha:%d/%m/%Y}")
               .replace("__GENERADO__", datetime.now(UTC).strftime("%Y-%m-%d %H:%M"))
               .replace("__NAV__", "".join(nav))

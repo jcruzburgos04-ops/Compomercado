@@ -3,9 +3,14 @@ name: Diario
 # Descarga datos, corre el análisis, guarda el registro forward y publica el dashboard en GitHub Pages.
 on:
   schedule:
-    # 10:30 UTC de martes a sábado: antes de la apertura de EE. UU., con la rueda anterior completa
-    # en Yahoo (que tarda horas en cerrar la barra diaria) y el open interest de opciones actualizado.
-    - cron: "30 10 * * 2-6"
+    # GitHub demora los cron hasta varias horas (las corridas de las 10:30 UTC arrancaban a las 15:00,
+    # con EE. UU. ya abierto) y a veces los saltea. Por eso hay dos corridas, en minutos poco usados:
+    # - 22:47 UTC de lunes a viernes: después del cierre, trae la rueda del día.
+    # - 06:17 UTC de martes a sábado: respaldo de madrugada; completa lo que Yahoo o CBOE no tenían
+    #   a la noche y toma el snapshot de opciones con el open interest ya actualizado.
+    # El registro forward no se duplica: guarda una sola fila por rueda (la primera corrida que la ve).
+    - cron: "47 22 * * 1-5"
+    - cron: "17 6 * * 2-6"
   workflow_dispatch:
   push:
     branches: [claude/awesome-wright-d8v4po]
