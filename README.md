@@ -21,6 +21,8 @@ Secciones:
 - **Mapa de comportamiento**: cada sector, industria, factor, país, activo y canasta contra SPY, QQQ, IWM, EFA y EEM. Incluye refugios con fuerza hoy y qué reducir primero.
 - **Caídas**: cada tramo ≥5 % de SPY desde 1993, con su huella macro y su tipo.
 - **Huellas y análogos**: cómo estaban los indicadores y pilares un mes y una semana antes, en el pico, en la confirmación y en el valle de cada caída; qué se repite; y qué días del pasado se parecen a hoy, con su probabilidad de caída evaluada fuera de muestra.
+- **Flujos institucionales**: qué están haciendo bancos (dealers), institucionales (asset managers), hedge funds y operadores chicos en los futuros del S&P 500, Nasdaq, Russell, VIX, Tesoro y monedas (CFTC), y los balances de los bancos (Fed). Se evalúa si anticipan caídas; por ahora no suma al puntaje.
+- **Anomalías**: días raros detectados al cierre (pánicos, gaps, VIX y SPY subiendo juntos, crédito que no acompaña, turbulencia, shock del yen, posiciones extremas, bancos en la ventanilla de la Fed) con su historial de aciertos, y las anomalías clásicas de calendario y factores desde 1926.
 - **Screener**: refugios con fuerza, canarios debilitándose, fortaleza en debilidad, qué reducir primero y acciones de tus canastas; screens propios en `config/screener.yaml`.
 - **Fichas**: qué mide cada indicador, de dónde sale, su demora, su hipótesis y qué mostraron los datos.
 - **Historia desde 1926**: 49 industrias Fama-French en cada mercado bajista.
@@ -31,7 +33,7 @@ Secciones:
 
 ```bash
 pip install -e ".[dev]"
-compomercado datos       # descarga Yahoo, FRED, CBOE y Ken French a ./datos
+compomercado datos       # descarga Yahoo, FRED, CBOE, CFTC y Ken French a ./datos
 compomercado analizar    # corre el análisis y construye ./sitio/index.html
 pytest                   # tests (incluye el test anti look-ahead)
 ```
@@ -47,7 +49,7 @@ Los universos, canastas propias y parámetros se editan en [`config/`](config/).
 | F2: indicadores + dashboard | ✓ 77 indicadores: 8 pilares que suman al puntaje (la ponderación elige cuáles cuentan), amplitud del S&P 500 actual y calendario como contexto; ficha por indicador; screener; dashboard en Pages; registro forward. Puerta: test anti look-ahead y test de fichas en verde |
 | F3: sensor validado | Siguiente. Ya adelantado: ponderación walk-forward, huellas de las caídas y análogos, evaluados fuera de muestra |
 | F4: backtest de overlay y rotación | Pendiente |
-| F5: flujo institucional (COT, FINRA, insiders) | Pendiente |
+| F5: flujo institucional (COT, FINRA, insiders) | Adelantado: COT (CFTC TFF) y balances de bancos (Fed) como pilar en evaluación, fuera del total; anomalías de mercado. Pendiente: FINRA, insiders |
 
 Documentos:
 

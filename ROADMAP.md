@@ -349,6 +349,11 @@ Cada fase termina con una **puerta de salida**: un criterio objetivo que hay que
 
 **Puerta**: aporte incremental fuera de muestra demostrado, o se documenta y se descarta.
 
+**Adelantado** (pedido del usuario: "estudiar los flujos de bancos e instituciones" y "las anomalías de mercado y la capacidad de detectarlas"):
+
+- COT TFF de la CFTC (dealers, asset managers, fondos apalancados y operadores chicos en índices, VIX, Tesoro y monedas) y balances de bancos de la Fed (H.8, H.4.1, encuesta de crédito) como **pilar institucional en evaluación**: se calcula y se compara fuera de muestra el total con y sin el pilar, pero no suma hasta pasar esta puerta ([metodología §12](docs/metodologia_backtest.md)).
+- **Anomalías**: detectores de días raros evaluados como eventos (lift, significancia corregida, desde máximos, cobertura de los tramos de 5 %) y anomalías clásicas de calendario y factores por era desde 1926 ([metodología §13](docs/metodologia_backtest.md)).
+
 ### Fase 6: Modelos avanzados (continuo)
 
 - Gradient boosting monotónico + SHAP, HMM de régimen, analogías, DCC-GARCH y cópulas para la cola.

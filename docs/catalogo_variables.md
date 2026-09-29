@@ -112,7 +112,8 @@ Norgate (pago) resuelve esto si hace falta.
 
 | Variable | Qué mide / cálculo | Fuente | Historia | Lag | Fase |
 |----------|--------------------|--------|----------|-----|------|
-| COT TFF: posición neta de asset managers y leveraged funds en ES, NQ, RTY, VX, bonos, yen; percentil 3 años | Posicionamiento extremo, crowding | CFTC | 2006 (legacy 1986) | datos del martes, publicados el viernes | F5 |
+| COT TFF: posición neta de dealers, asset managers, leveraged funds y no reportables en ES, NQ, RTY, VX, Tesoro 2/10/30, yen, euro, dólar, bitcoin; z de 3 años e índice COT | Posicionamiento extremo, crowding | CFTC | 2006 (legacy 1986) | datos del martes, publicados el viernes (lag 4 días) | ✓ (fuera del total, en evaluación) |
+| Bancos: crédito total, depósitos, préstamos a empresas (H.8), reservas y ventanilla de descuento (H.4.1), encuesta de crédito (SLOOS) | Balance y liquidez de los bancos | FRED | 1973 (H.8), 2002 (ventanilla), 1990 (SLOOS) | 2–45 días | ✓ (fuera del total, en evaluación) |
 | Short volume fuera de bolsa → **índice tipo DIX** | Ratio de short volume en dark pools ponderado por dólares. Alto suele indicar market makers vendiendo a compradores institucionales (a testear) | FINRA Reg SHO diario | ≈2009 | T+1 | F5 |
 | Volumen ATS (dark pools) por ticker | Participación institucional por activo | FINRA OTC Transparency | 2014 | 2–4 semanas | F5 |
 | **Días de distribución / acumulación** | Índice cae ≥ 0,2 % con más volumen que el día anterior; conteo en 25 ruedas | Derivado | 1993 | — | F2 |
